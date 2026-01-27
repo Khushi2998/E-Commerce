@@ -12,6 +12,7 @@ namespace ECommerce.DTOs
         public string Description { get; set; }
         [Required]
         public string CategoryName { get; set; }
+        public int Stock { get; set; }
         public IFormFile? Image { get; set; }
     }
 }

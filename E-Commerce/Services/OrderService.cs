@@ -1,4 +1,4 @@
-﻿/*using ECommerce.Data;
+﻿using ECommerce.Data;
 using ECommerce.DTOs;
 using ECommerce.Models;
 using Microsoft.EntityFrameworkCore;
@@ -51,4 +51,3 @@ namespace ECommerce.Services
         }
     }
 }
-*/

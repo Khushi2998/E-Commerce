@@ -16,8 +16,11 @@ namespace ECommerce.Models
         public string Description { get; set; }
 
         [Required]
+        [Column (TypeName = "decimal(10,2)")]
         public decimal Price { get; set; }
-       public string? Image { get; set; }
+        public string? Image { get; set; }
+        public int Stock { get; set; }
+        public bool IsActive { get; set; } = true;
 
         // FK
         public int CategoryId { get; set; }

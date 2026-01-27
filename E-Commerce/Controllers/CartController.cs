@@ -45,6 +45,17 @@ namespace ECommerce.Controllers
             return Ok(items);
         }
 
+        [HttpGet("count")]
+        [Authorize(Roles ="Customer")]
+        public async Task<IActionResult>GetCartCount()
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+            var count = await _context.CartItems
+                .Where(c => c.CustomerId == userId)
+                .SumAsync(c=>c.Quantity);
+            return Ok(count);
+        }
+
         //  ADD to cart
         [HttpPost]
         public async Task<IActionResult> CartAdd([FromBody] CartAddDto dto)
@@ -70,6 +81,7 @@ namespace ECommerce.Controllers
                 };
 
                 _context.CartItems.Add(cartItem);
+                await _context.SaveChangesAsync();
             }
 
             await _context.SaveChangesAsync();
@@ -102,12 +114,19 @@ namespace ECommerce.Controllers
             var item = await _context.CartItems
                 .FirstOrDefaultAsync(c => c.Id == id && c.CustomerId == customerId);
 
-            if (item == null) return NotFound();
+            if (item == null) return NotFound("Item Not Found");
 
             _context.CartItems.Remove(item);
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Conflict("Cart item already deleted");
+            }
 
-            return NoContent();
+            return Ok(new { message = "Item removed successfully" });
         }
     }
 }

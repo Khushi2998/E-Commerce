@@ -12,19 +12,25 @@ public class EmailService
 
     public async Task SendAsync(string to, string subject, string body)
     {
-        var smtp = new SmtpClient(_config["Smtp:Host"])
+        ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+
+        var smtp = new SmtpClient(
+            _config["AppSettings:EmailSettings:SmtpServer"]
+        )
         {
-            Port = int.Parse(_config["Smtp:Port"]!),
+            Port = int.Parse(_config["AppSettings:EmailSettings:Port"]),
+            EnableSsl = true,
             Credentials = new NetworkCredential(
-                _config["Smtp:Username"],
-                _config["Smtp:Password"]
-            ),
-            EnableSsl = true
+                _config["AppSettings:EmailSettings:From"],
+                _config["AppSettings:EmailSettings:Password"]
+            )
         };
 
         var mail = new MailMessage
         {
-            From = new MailAddress(_config["Smtp:Username"]!),
+            From = new MailAddress(
+                _config["AppSettings:EmailSettings:From"]
+            ),
             Subject = subject,
             Body = body,
             IsBodyHtml = true
@@ -34,4 +40,5 @@ public class EmailService
 
         await smtp.SendMailAsync(mail);
     }
+
 }
