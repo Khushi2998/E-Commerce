@@ -1,6 +1,7 @@
 import { useState } from "react";
 import axios from "axios";
-import {NavLink} from 'react-router-dom'
+import { NavLink } from "react-router-dom";
+import { toast } from "sonner";
 
 const API = axios.create({
   baseURL: "https://localhost:7248/api/auth",
@@ -13,7 +14,7 @@ const Register = () => {
   const [formData, setFormData] = useState({
     name: "",
     contact: "",
-    email: ""
+    email: "",
   });
 
   const handleChange = (e) => {
@@ -25,19 +26,21 @@ const Register = () => {
 
     try {
       const res = await API.post("/register", formData);
-      alert(res.data); 
+
+      toast.success("🎉 Registration successful! Check your email.");
+
       setFormData({
         name: "",
         contact: "",
-        email: ""
-      }); 
+        email: "",
+      });
     } catch (err) {
-   
-      const message = err.response?.data || err.message;
-      alert("Registration failed: " + message);
-      console.error("Registration error:", message);
-    }
-  };
+      if (err.response?.status === 409) {
+    toast.error("📧 Email already registered");
+  } else {
+    toast.error("❌ Registration failed. Try again");
+  }
+}};
 
   return (
     <div className="register-container">
@@ -56,7 +59,7 @@ const Register = () => {
 
           <input
             name="contact"
-            type="text" 
+            type="text"
             placeholder="Contact"
             value={formData.contact}
             onChange={handleChange}
@@ -73,9 +76,9 @@ const Register = () => {
 
           <button type="submit">Register</button>
         </form>
+
         <NavLink to="/login">Already Registered?</NavLink>
       </div>
-      
     </div>
   );
 };

@@ -6,7 +6,7 @@ const Footer = () => {
       <div className="footer-container">
 
         <div className="footer-section">
-          <h3>InfinityStore</h3>
+          <h3>Infinity Store</h3>
           <p>Your one-stop shop for quality products at the best price.</p>
         </div>
 

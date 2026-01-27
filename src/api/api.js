@@ -1,68 +1,46 @@
 import axios from "axios";
 
-
 const api = axios.create({
   baseURL: "https://localhost:7248/api",
 });
 
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+
+api.interceptors.request.use(config => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+
+api.interceptors.response.use(
+  res => res,
+  err => {
+    if (err.response?.status === 401) {
+      localStorage.clear();
+      window.location.href = "/login"; 
     }
-    return config;
-  },
-  (error) => Promise.reject(error)
+    return Promise.reject(err);
+  }
 );
 
+export const getMyOrders = () =>
+  api.get("/my/orders");
 
-/**
- * PUBLIC – get all products
- * GET /api/products
- */
-// export const getProducts = async () => {
-//   const res = await api.get("/products");
+export const getOrderDetails = (orderId) =>
+  api.get(`/orders/${orderId}`);
 
-//   // Handle .NET $values issue safely
-//   return Array.isArray(res.data)
-//     ? res.data
-//     : res.data?.$values || [];
-// };
+// ADMIN
+export const getAllOrders = () =>
+  api.get("/admin/orders");
 
-/**
- * PUBLIC – get product by id
- * GET /api/products/{id}
- */
-export const getProductById = async (id) => {
-  const res = await api.get(`/products/${id}`);
-  return res.data;
-};
+export const updateOrderStatus = (orderId, status) =>
+  api.put(`/admin/orders/${orderId}/status`, 
+   {status: status});
 
-/**
- * ADMIN – create product
- * POST /api/products
- */
-export const createProduct = async (product) => {
-  const res = await api.post("/products", product);
-  return res.data;
-};
+// export const getOrderDetails = (orderId) =>
+//   axios.get(`/orders/${orderId}`);
 
-/**
- * ADMIN – update product
- * PUT /api/products/{id}
- */
-export const updateProduct = async (id, product) => {
-  await api.put(`/products/${id}`, product);
-};
+ export default api;
 
-/**
- * ADMIN – delete product
- * DELETE /api/products/{id}
- */
-export const deleteProduct = async (id) => {
-  await api.delete(`/products/${id}`);
-};
-
-
-export default api;

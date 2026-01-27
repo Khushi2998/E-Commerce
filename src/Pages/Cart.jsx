@@ -1,17 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState,useContext } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   getCart,
   updateCartItem,
   removeCartItem,
   checkout,
 } from "../api/cartApi";
-
-
+import {confirmDelete} from "../auth/confirmDelete"
+import { MdDeleteOutline } from "react-icons/md";
+import {CartContext} from "../components/CartContext";
 
 const Cart = () => {
   const [cart, setCart] = useState([]);
   const [editingQty, setEditingQty] = useState({});
-
+  const { fetchCartCount } = useContext(CartContext);
+  const navigate = useNavigate();
   const loadCart = async () => {
     const data = await getCart();
     setCart(data);
@@ -36,9 +39,8 @@ const Cart = () => {
 
     if (qty < 1) {
       await removeCartItem(item.cartId);
-      setCart((prev) =>
-        prev.filter((i) => i.cartId !== item.cartId)
-      );
+      setCart((prev) =>prev.filter((i) => i.cartId !== item.cartId)
+      )
       return;
     }
 
@@ -55,6 +57,10 @@ const Cart = () => {
 
  const updateQty=async (item,delta)=> {
   const newQty=item.quantity+delta;
+  if (newQty < 1) {
+    const ok = await confirmDelete("Remove this item from cart?");
+    if (!ok) return;
+  }
 
   setCart((prev)=>
   newQty<1? prev.filter((i)=> i.cartId !==item.cartId):prev.map((i)=>
@@ -69,6 +75,7 @@ const Cart = () => {
     }else{
       await updateCartItem(item.cartId,newQty);
     }
+    await fetchCartCount();
   }catch(err){
     console.error(err);
     loadCart();
@@ -76,26 +83,31 @@ const Cart = () => {
  }
 
   const handleRemove = async (id) => {
+     const ok = await confirmDelete("Remove this item from cart?");
+  if (!ok) return;
+    try{
     await removeCartItem(id);
-    setCart((prev) => prev.filter((i) => i.cartId !== id));
-  };
-
+    await fetchCartCount();
+    await loadCart();
+    }catch (err) {
+    console.error("Failed to remove item:", err);
+    }};
   const handleCheckout = async () => {
-    const result = await checkout();
-    alert(`Order #${result.orderId} placed!`);
-    setCart([]);
-  };
+   
+    navigate("/checkout");
+ 
+};
 
   const total = cart.reduce((sum, i) => sum + i.total, 0);
 
   return (
-    <div className="cart-container">
-      <h2>Your Cart</h2>
+    <div className="cart-page">
+      <h2>My Cart</h2>
 
       {cart.length === 0 && <p className="empty">Cart is empty</p>}
 
       {cart.map((item) => (
-        <div key={item.cartId} className="cart-row">
+        <div key={item.cartId} className="cart-card">
           <img src={`http://localhost:5253${item.image}`} alt={item.productName} />
 
           <div className="info">
@@ -105,11 +117,11 @@ const Cart = () => {
 
           <div className="qty-control">
             <button
-              className="qty-btn"
-              disabled={item.quantity <= 1}
-              onClick={() => updateQty(item, -1)}
-            >
-              −
+            className={`qty-btn ${item.quantity === 1 ? "danger" : ""}`}
+    onClick={() => updateQty(item, -1)}
+    title={item.quantity === 1 ? "Remove item" : "Decrease quantity"}
+  >
+    {item.quantity === 1 ? <MdDeleteOutline /> : "−"}
             </button>
 
             <span className="qty-value">{item.quantity}</span>

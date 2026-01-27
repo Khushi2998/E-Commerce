@@ -1,61 +1,82 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import './App.css'
+import "./App.css";
+
 import Navbar from "./components/Navbar";
+import Footer from "./Pages/Footer";
+
 import Home from "./Pages/Home";
 import ProductDetails from "./Pages/ProductDetails";
+import Cart from "./Pages/Cart";
+// import CheckoutPage from "./Pages/Payment";
+import Search from "./components/Search";
+import RegisterUser from "./Pages/Register";
+import Login from "./auth/Login";
+import Invoice from "./Pages/Invoice";
+import Profile from "./Pages/Profiles";
+import Orders from "./Pages/Orders";
+import OrderDetails from "./Pages/OrderDetails";
+import AdminOrders from "./admin/AdminOrders";
+import ProtectedRoute from "./auth/ProtectedRoute";
+
+import CheckoutAddress from "./components/CheckoutAddress";
+import OrderSuccess from "./Pages/OrderSuccess";
+
+// Admin
 import AdminLayout from "./admin/AdminLayout";
 import AdminProducts from "./admin/AdminProducts";
 import AdminCategories from "./admin/AdminCategories";
 import AdminFeedback from "./admin/AdminFeedback";
 import AdminFAQs from "./admin/AdminFAQs";
-import ProtectedRoute from "./auth/ProtectedRoute";
-import RegisterUser from "./Pages/Register";
-import LoginUser from "./auth/LoginUser";
-import LoginAdmin from "./auth/LoginAdmin";
-import Cart from "./Pages/Cart";
-import CheckoutPage from "./Pages/Payment";
-import Footer from "./Pages/Footer";
-
+import Wishlist from "./Pages/Wishlist";
 
 export default function App() {
   return (
     <BrowserRouter>
-   
       <Navbar />
-      
-     
+
       <Routes>
-      
-        <Route path="/" element={<Home/>} />
+        {/*PUBLIC*/}
+        <Route path="/" element={<Home />} />
         <Route path="/products/:id" element={<ProductDetails />} />
         <Route path="/register" element={<RegisterUser />} />
-        <Route path="/login" element={<LoginUser />} />
-        <Route path="/admin/login" element={<LoginAdmin />} />
-        <Route path="/cart" element={
-            <ProtectedRoute>
+        <Route path="/login" element={<Login />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/CheckoutAddress" element={<CheckoutAddress />} />
+        <Route path="/order-success/:id" element={<OrderSuccess />} /> 
+        <Route path="/invoice/:id" element={<Invoice/>} />
+        <Route path="/orders" element={<Orders />} />
+        <Route path="/orders/:id" element={<OrderDetails />} />
+        <Route path="/wishlist" element={<Wishlist/>}/>
+        {/*CUSTOMER*/}
+        <Route path="/cart" element={<ProtectedRoute role="Customer">
               <Cart />
-            </ProtectedRoute>}/>
-        <Route path="" element={
-          <ProtectedRoute>
-            <CheckoutPage>
-                {/* <ShippingAddress/> */}
-                {/* <OrderSummary cartItems={cartItems} amount={amount} /> */}
-                {/* <PaymentButton orderId={orderId} amount={amount} selectedAddress={selectedAddress} /> */}
-              </CheckoutPage>
-          </ProtectedRoute>
-        }/>
+            </ProtectedRoute>}
+        />
+        <Route path="/search" element={<Search />} />
+        <Route path="/checkout" element={
+            <ProtectedRoute role="Customer">
+              <CheckoutAddress />
+            </ProtectedRoute>}
+        />
 
-
-
-        <Route path="/admin/*" element={<ProtectedRoute adminOnly><AdminLayout /></ProtectedRoute> }/>
-       <Route path="products" element={<AdminProducts />} />
+        {/*ADMIN*/}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute role="Admin">
+              <AdminLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="orders"element={<AdminOrders />}/>
+          <Route path="products" element={<AdminProducts />} />
           <Route path="categories" element={<AdminCategories />} />
-          
           <Route path="feedback" element={<AdminFeedback />} />
           <Route path="faqs" element={<AdminFAQs />} />
-          
+        </Route>
       </Routes>
-      <Footer/>
+
+      <Footer />
     </BrowserRouter>
   );
 }

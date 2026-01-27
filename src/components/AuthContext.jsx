@@ -18,6 +18,13 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem("token", data.token);
   };
 
+
+// setUser({
+//   name: res.data.name,
+//   email: res.data.email,
+//   role: res.data.role,
+// });
+
   const logout = () => {
     setUser(null);
     localStorage.removeItem("user");

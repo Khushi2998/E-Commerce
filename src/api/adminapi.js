@@ -1,24 +1,66 @@
-import axios from "axios";
-import { getToken } from "../auth/auth";
+// src/api/adminapi.js
+import api from "./api";
 
-const API = axios.create({
-  baseURL: "https://localhost:7248/api/auth/admin/login",
-});
+// CATEGORIES
+export const getCategories = async () => {
+  const res = await api.get("/admin/categories");
+  return res.data; // only data
+};
 
-API.interceptors.request.use(config => {
-  const token = getToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+export const addCategory = async (payload) => {
+  await api.post("/admin/categories",payload)};
 
-export const getAdminProducts = () => API.get("/products");
-export const addAdminProduct = (data) => API.post("/products", data);
-export const deleteAdminProduct = (id) => API.delete(`/products/${id}`);
+export const deleteCategory = async (payload) => {
+  await api.delete(`/admin/categories/${id}`,payload)}; 
 
-export const getCategories = () => API.get("/categories");
-export const addCategory = (data) => API.post("/categories", data);
+export const updateCategory = async (payload) => {
+  await api.put(`/admin/categories/${id}`,payload)};  
 
-export const getFeedback = () => API.get("/feedback");
-export const getFAQs = () => API.get("/faqs");
+// PRODUCTS
+export const getAdminProducts = async () => {
+  const res = await api.get("/admin/products");
+  return res.data;
+};
+
+export const addAdminProduct = async (product) => {
+  return await api.post("/admin/products", product);
+};
+
+export const deleteAdminProduct = async (id) => {
+  return await api.delete(`/admin/products/${id}`);
+};
+
+export const updateAdminProduct = (id, formData) => {
+  return api.put(`/admin/products/${id}`, formData);
+};
+
+export const getAllOrders = () =>
+  api.get("/admin/orders");
+
+export const updateOrderStatus = (orderId, status) =>{
+  return api.put(`/admin/orders/${orderId}/status`, {status: status},
+    {
+      headers: {
+        "Content-Type": "application/json"
+      }
+    }
+  );
+}
+
+export const getFeedback = () => {
+  return api.get("/feedback");
+};
+
+export const getFAQs = () => {
+  return api.get("/faqs");
+};
+
+// add FAQ
+export const addFAQ = (data) => {
+  return api.post("/faqs", data);
+};
+
+// delete FAQ
+export const deleteFAQ = (id) => {
+  return api.delete(`/faqs/${id}`);
+};

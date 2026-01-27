@@ -1,4 +1,5 @@
 import api from "./api";
+import { CartProvider } from "../components/CartContext";
 
 // GET cart items
 export const getCart = async () => {
@@ -48,10 +49,10 @@ export const removeCartItem = async (cartId) => {
 };
 
 // CHECKOUT
-export const checkout = async () => {
+export const checkout = async (paymentMethod) => {
   const res = await api.post(
     "/checkout",
-    {},
+    {paymentMethod},
     {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../api/api";
-import Banner from "../components/Banner"
+import bannerimg from "../../public/bannerimg.avif"
 import ProductCard from '../components/ProductCard';
 
 
@@ -18,9 +18,9 @@ const Home = () => {
 
   return (
     <>
-    <header>
-     
-    <Banner/>
+    <header className="banner-header">
+     <img src={bannerimg} alt="Banner" />
+    
     </header>
     <div className="container">
       <h1>Products</h1>

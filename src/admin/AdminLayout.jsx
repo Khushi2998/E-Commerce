@@ -7,6 +7,7 @@ export default function AdminLayout() {
       <aside>
         <h2>Admin Panel</h2>
         <Link to="products">Products</Link>
+        <Link to="orders">Orders</Link>
         <Link to="categories">Categories</Link>
         <Link to="feedback">Feedback</Link>
         <Link to="faqs">FAQs</Link>

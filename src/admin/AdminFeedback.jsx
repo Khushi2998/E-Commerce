@@ -2,18 +2,30 @@ import { useEffect, useState } from "react";
 import { getFeedback } from "../api/adminapi";
 
 export default function AdminFeedback() {
-  const [data, setData] = useState([]);
+  const [feedbacks, setFeedbacks] = useState([]);
 
   useEffect(() => {
-    getFeedback().then(res => setData(res.data));
+    getFeedback()
+      .then(res => {
+        console.log("FEEDBACK RESPONSE ", res.data);
+        setFeedbacks(res.data);
+      })
+      .catch(err => console.error(err));
   }, []);
 
   return (
     <>
       <h2>Feedback</h2>
-      {data.map(f => (
-        <p key={f.id}>{f.message}</p>
-      ))}
+
+      {feedbacks.length === 0 ? (
+        <p>No feedback found</p>
+      ) : (
+        <ul>
+          {feedbacks.map(f => (
+            <li key={f.id}>{f.message}</li>
+          ))}
+        </ul>
+      )}
     </>
   );
 }
