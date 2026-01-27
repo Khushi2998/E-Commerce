@@ -1,10 +1,10 @@
-﻿/*using ECommerce.Data;
+﻿using ECommerce.Data;
+using ECommerce.DTOs;
 using ECommerce.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
-using ECommerce.DTOs;
 
 namespace ECommerce.Controllers
 {
@@ -19,53 +19,45 @@ namespace ECommerce.Controllers
             _context = context;
         }
 
-        // Customer submits feedback
-        
-    [Authorize(Roles = "Customer")]
-    [HttpPost]
-    public async Task<IActionResult> SubmitFeedback([FromBody] FeedbackCreateDto dto)
-    {
-        // Validate input
-        if (dto == null)
-            return BadRequest("Feedback data is required");
-
-        if (string.IsNullOrWhiteSpace(dto.Message))
-            return BadRequest("Message cannot be empty");
-
-        if (dto.Rating < 1 || dto.Rating > 5)
-            return BadRequest("Rating must be between 1 and 5");
-
-        // Get logged-in customer ID
-        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!int.TryParse(userIdClaim, out int customerId))
-            return Unauthorized();
-
-        // Create Feedback entity manually
-        var feedback = new Feedback
+    
+        [Authorize(Roles = "Customer")]
+        [HttpPost]
+        public async Task<IActionResult> SubmitFeedback([FromBody] FeedbackCreateDto dto)
         {
-            Message = dto.Message,
-            Rating = dto.Rating,
-            CustomerId = customerId,
-            CreatedAt = DateTime.UtcNow
-        };
+            if (dto == null || string.IsNullOrWhiteSpace(dto.Message))
+                return BadRequest("Invalid feedback data");
 
-        _context.Feedbacks.Add(feedback);
-        await _context.SaveChangesAsync();
+            if (dto.Rating < 1 || dto.Rating > 5)
+                return BadRequest("Rating must be between 1 and 5");
 
-        return Ok(new { message = "Feedback submitted successfully" });
-    }
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userId, out int customerId))
+                return Unauthorized();
 
+            var feedback = new Feedback
+            {
+                Message = dto.Message,
+                Rating = dto.Rating,
+                CustomerId = customerId,
+                CreatedAt = DateTime.UtcNow
+            };
 
+            _context.Feedbacks.Add(feedback);
+            await _context.SaveChangesAsync();
 
-        // Admin views all feedback
+            return Ok(new { message = "Feedback submitted successfully" });
+        }
+
         [Authorize(Roles = "Admin")]
         [HttpGet]
         public async Task<IActionResult> GetAllFeedback()
         {
-            var feedbacks = await _context.Feedbacks
-                .Include(f => f.Customer)
-                .OrderByDescending(f => f.CreatedAt)
-                .Select(f => new FeedbackResponseDto
+            var feedbacks = await (
+                from f in _context.Feedbacks
+                join c in _context.Customers
+                    on f.CustomerId equals c.Id
+                orderby f.CreatedAt descending
+                select new FeedbackResponseDto
                 {
                     Id = f.Id,
                     Message = f.Message,
@@ -73,16 +65,14 @@ namespace ECommerce.Controllers
                     CreatedAt = f.CreatedAt,
                     Customer = new CustomerMiniDto
                     {
-                        Id = f.Customer.Id,
-                        Name = f.Customer.Name,
-                        Email = f.Customer.Email
+                        Id = c.Id,
+                        Name = c.Name,
+                        Email = c.Email
                     }
-                })
-                .ToListAsync();
+                }
+            ).ToListAsync();
 
             return Ok(feedbacks);
         }
-
     }
 }
-*/

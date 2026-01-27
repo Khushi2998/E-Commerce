@@ -1,13 +1,10 @@
-
 using ECommerce.Data;
-
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 using System.Text;
-using AuthApi.Email;
 using ECommerce.Services;
 
 
@@ -27,9 +24,11 @@ namespace ECommerce
                 ));
             // Add services to the container.
 
-            builder.Services.AddEmailService(builder.Configuration);
-
-            builder.Services.AddControllers();
+            builder.Services.AddControllers()
+                .AddJsonOptions(options =>
+                {
+                    options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+                });
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
@@ -48,10 +47,10 @@ namespace ECommerce
                 options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
                 options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
             })
-.AddJwtBearer(options =>
-{
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
+                           .AddJwtBearer(options =>
+         {
+           options.TokenValidationParameters = new TokenValidationParameters
+         { 
         ValidateIssuer = true,
         ValidateAudience = true,
         ValidateLifetime = true,
@@ -68,7 +67,8 @@ namespace ECommerce
             builder.Services.AddScoped<IAuthService, AuthService>();
             builder.Services.AddScoped<IProductService, ProductService>();
             builder.Services.AddScoped<CheckoutService>();
-            builder.Services.AddScoped<CartService>(); 
+            builder.Services.AddScoped<CartService>();
+            builder.Services.AddScoped<InvoiceService>();
 
 
 

@@ -16,8 +16,19 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody]RegisterDto dto)
     {
-        await _authService.RegisterAsync(dto);
-       return StatusCode(201, "Registration successful");
+        try
+        {
+            await _authService.RegisterAsync(dto);
+            return Ok("Registration successful");
+        }
+        catch (InvalidOperationException ex) when (ex.Message == "EMAIL_EXISTS")
+        {
+            return Conflict(new { message = "Email already registered" });
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, new { message = "Something went wrong. Please try again." });
+        }
     }
     [HttpPost("login")]
     [Consumes("application/json")]
@@ -33,8 +44,4 @@ public class AuthController : ControllerBase
 
         return Ok(result);
     }
-
-
-
-
 }

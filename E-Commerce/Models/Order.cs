@@ -1,5 +1,6 @@
-﻿using System.ComponentModel.DataAnnotations;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ECommerce.Models
 {
@@ -7,14 +8,24 @@ namespace ECommerce.Models
     {
         [Key]
         public int Id { get; set; }
+        [Column(TypeName = "decimal(10,2)")]
+        public decimal SubTotal { get; set; }
 
+        [Column(TypeName = "decimal(10,2)")]
+        public decimal Tax { get; set; }
+
+        [Column(TypeName = "decimal(10,2)")]
         public decimal TotalAmount { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.Now;
 
         // FK
         public int CustomerId { get; set; }
-        public string Status { get; set; } = "Pending"; // Pending, Shipped, Delivered
-        
-    
-}
+        public string PaymentMethod { get; set; }
+        public OrderStatus Status { get; set; } = OrderStatus.Pending;
+        public string ShippingAddress { get; set; }
+        public string? RazorpayOrderId { get; set; }
+        public string? RazorpayPaymentId { get; set; }
+        public DateTime? PaidAt { get; set; }
+
+    }
 }

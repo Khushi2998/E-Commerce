@@ -65,7 +65,7 @@ public class AuthService : IAuthService
         <p>Your account has been created.</p>
         <p><b>Email:</b> {dto.Email}</p>
         <p><b>Password:</b> {generatedPassword}</p>
-        <p>Please change your password after login.</p>"
+        <p>Please enter this password to login.</p>"
         );
     }
 
@@ -106,8 +106,8 @@ public class AuthService : IAuthService
             Token = token,
             UserId = user.Id,
             Name = user.Name,
-            Email = user.Email
-            
+            Email = user.Email,
+            Role=user.RoleName
         };
     }
 

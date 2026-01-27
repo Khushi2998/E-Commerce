@@ -1,9 +1,11 @@
 ﻿using ECommerce.Data;
 using ECommerce.DTOs;
 using ECommerce.Models;
+using Humanizer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace ECommerce.Controllers
 {
@@ -19,9 +21,7 @@ namespace ECommerce.Controllers
             _context = context;
         }
 
-        // ==============================
-        // Products
-        // ==============================
+
         [HttpGet("products")]
         public async Task<IActionResult> GetProducts()
         {
@@ -32,7 +32,10 @@ namespace ECommerce.Controllers
                     ProductName = p.Name,
                     ProductPrice = p.Price,
                     ProductDescription = p.Description,
-                    ProductImage = p.Image
+                    ProductImage = p.Image,
+                    ProductCategory=p.CategoryId,
+                    ProductStock=p.Stock,
+                    ProductIsActive=p.IsActive
                 })
                 .ToListAsync();
 
@@ -40,14 +43,37 @@ namespace ECommerce.Controllers
         }
 
         [HttpPost("products")]
-        public async Task<IActionResult> AddProduct([FromForm] ProductCreateDto dto)
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Create([FromForm] ProductCreateDto dto)
         {
-            string? imageUrl = null;
+            if (string.IsNullOrWhiteSpace(dto.CategoryName))
+                return BadRequest("CategoryName is required");
+
+            var category = await _context.Categories
+                .FirstOrDefaultAsync(c =>
+                    c.Name.ToLower() == dto.CategoryName.Trim().ToLower());
+
+            if (category == null)
+            { 
+                category = new Category
+                {
+                    Name = dto.CategoryName.Trim()
+                };
+
+            _context.Categories.Add(category);
+            await _context.SaveChangesAsync();
+        }
+
+        string? imageUrl = null;
 
             if (dto.Image != null)
             {
+                var uploadDir = Path.Combine("wwwroot", "images");
+                if (!Directory.Exists(uploadDir))
+                    Directory.CreateDirectory(uploadDir);
+
                 var fileName = Guid.NewGuid() + Path.GetExtension(dto.Image.FileName);
-                var path = Path.Combine("wwwroot/images", fileName);
+                var path = Path.Combine(uploadDir, fileName);
 
                 using var stream = new FileStream(path, FileMode.Create);
                 await dto.Image.CopyToAsync(stream);
@@ -59,8 +85,10 @@ namespace ECommerce.Controllers
             {
                 Name = dto.Name,
                 Price = dto.Price,
-                Description = dto.Description,
-                Image = imageUrl
+                CategoryId = category.Id,
+                Image = imageUrl,
+                Stock=dto.Stock,
+                Description = dto.Description ?? ""
             };
 
             _context.Products.Add(product);
@@ -70,6 +98,7 @@ namespace ECommerce.Controllers
         }
 
         [HttpPut("products/{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateProduct(int id, [FromForm] ProductUpdateDto dto)
         {
             var product = await _context.Products.FindAsync(id);
@@ -93,13 +122,26 @@ namespace ECommerce.Controllers
                 product.Image = "/images/" + fileName;
             }
 
-            product.Name = dto.Name;
-            product.Price = dto.Price;
-            product.Description = dto.Description;
+            // Partial updates (SAFE)
+            if (dto.Name != null)
+                product.Name = dto.Name;
+
+            if (dto.Price.HasValue)
+                product.Price = dto.Price.Value;
+
+            if (dto.Description != null)
+                product.Description = dto.Description;
+
+            if (dto.IsActive.HasValue)
+                product.IsActive = dto.IsActive.Value;
+
+            if (dto.Stock.HasValue)
+                product.Stock = dto.Stock.Value;
 
             await _context.SaveChangesAsync();
-            return Ok(new { Message = "Product updated", ProductId = product.Id });
+            return Ok(product);
         }
+
 
         [HttpDelete("products/{id}")]
         public async Task<IActionResult> DeleteProduct(int id)
@@ -112,17 +154,14 @@ namespace ECommerce.Controllers
             return Ok(new { Message = "Product deleted" });
         }
 
-        // ==============================
-        // Categories
-        // ==============================
         [HttpGet("categories")]
-        public async Task<IActionResult> GetCategories()
+        public async Task<IActionResult> GetAll()
         {
             var categories = await _context.Categories
-                .Select(c => new
+                .Select(c => new CategoryResponseDto
                 {
-                    CategoryId = c.Id,
-                    CategoryName = c.Name
+                    Id = c.Id,
+                    Name = c.Name
                 })
                 .ToListAsync();
 
@@ -130,11 +169,43 @@ namespace ECommerce.Controllers
         }
 
         [HttpPost("categories")]
-        public async Task<IActionResult> AddCategory([FromBody] Category category)
+        public async Task<IActionResult> Create(CategoryCreateDto dto)
         {
-            _context.Categories.Add(category);
-            await _context.SaveChangesAsync();
-            return Ok(new { Message = "Category created", CategoryId = category.Id });
+            Category category = null;
+
+            // CASE 1: Existing category selected
+            if (dto.CategoryId.HasValue && dto.CategoryId > 0)
+            {
+                category = await _context.Categories
+                    .FindAsync(dto.CategoryId.Value);
+
+                if (category == null)
+                    return BadRequest("Invalid category");
+            }
+
+            // CASE 2: Other → create new
+            else if (!string.IsNullOrWhiteSpace(dto.NewCategoryName))
+            {
+                var existingCategory = await _context.Categories
+                    .FirstOrDefaultAsync(c =>
+                        c.Name.ToLower() == dto.NewCategoryName.ToLower());
+
+                if (existingCategory != null)
+                {
+                    category = existingCategory;
+                }
+                else
+                {
+                    category = new Category
+                    {
+                        Name = dto.NewCategoryName.Trim()
+                    };
+
+                    _context.Categories.Add(category);
+                    await _context.SaveChangesAsync();
+                }
+            }
+            return BadRequest("Category is required");
         }
 
         [HttpPut("categories/{id}")]
@@ -159,9 +230,7 @@ namespace ECommerce.Controllers
             return Ok(new { Message = "Category deleted" });
         }
 
-        // ==============================
-        // Feedback
-        // ==============================
+        
         [HttpGet("feedback")]
         public async Task<IActionResult> GetFeedback()
         {
@@ -178,9 +247,7 @@ namespace ECommerce.Controllers
             return Ok(feedbacks);
         }
 
-        // ==============================
-        // FAQs
-        // ==============================
+        
         [HttpGet("faqs")]
         public async Task<IActionResult> GetFAQs()
         {
@@ -196,9 +263,7 @@ namespace ECommerce.Controllers
             return Ok(faqs);
         }
 
-        // ==============================
-        // Orders
-        // ==============================
+      
         [HttpGet("orders")]
         public async Task<IActionResult> GetOrders()
         {
@@ -211,6 +276,7 @@ namespace ECommerce.Controllers
                                     CustomerName = c.Name,
                                     CustomerEmail = c.Email,
                                     TotalAmount = o.TotalAmount,
+                                    Status = (int)o.Status,
                                     CreatedAt = o.CreatedAt,
                                     Items = _context.OrderItems
                                         .Where(oi => oi.OrderId == o.Id)
@@ -226,5 +292,25 @@ namespace ECommerce.Controllers
 
             return Ok(orders);
         }
+
+        public class UpdateOrderStatusDto
+        {
+            public int Status { get; set; }
+        }
+
+        [HttpPut("orders/{orderId}/status")]
+        public async Task<IActionResult> UpdateStatus(int orderId,[FromBody] UpdateOrderStatusDto dto)
+        {
+            var order = await _context.Orders.FindAsync(orderId);
+            if (order == null)
+                return NotFound("Order not found");
+
+            order.Status = (OrderStatus)dto.Status;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { orderId, status = (int)dto.Status });
+        }
+
     }
 }

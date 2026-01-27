@@ -8,45 +8,59 @@ public class ProductService : IProductService
 {
     private readonly AppDbContext _context;
     private readonly IWebHostEnvironment _env;
+
     public ProductService(AppDbContext context, IWebHostEnvironment env)
     {
         _context = context;
         _env = env;
     }
 
+    // ========================= GET ALL =========================
     public async Task<IEnumerable<ProductResponseDto>> GetAllAsync()
     {
-        return await _context.Products
-            .Include(p => p.CategoryId)
-            .OrderBy(p => p.Id)
-            .Select(p => new ProductResponseDto
+        return await (
+            from p in _context.Products
+            join c in _context.Categories
+                on p.CategoryId equals c.Id
+            select new ProductResponseDto
             {
-                Id=p.Id,
+                Id = p.Id,
                 Name = p.Name,
                 Price = p.Price,
-                Description=p.Description,
-                Image = p.Image
-                
-            })
-            .ToListAsync();
+                Description = p.Description,
+                Image = p.Image,
+                IsActive = p.IsActive,
+                Stock = p.Stock,
+                CategoryName = c.Name
+            }
+        ).ToListAsync();
     }
 
+
+    // ========================= GET BY ID =========================
     public async Task<ProductResponseDto?> GetByIdAsync(int id)
     {
-        return await _context.Products
-            .Include(p => p.CategoryId)
-            .Where(p => p.Id == id)
-            .Select(p => new ProductResponseDto
+        return await (
+            from p in _context.Products
+            join c in _context.Categories
+                on p.CategoryId equals c.Id
+            where p.Id == id
+            select new ProductResponseDto
             {
-                Id=p.Id,   
+                Id = p.Id,
                 Name = p.Name,
                 Price = p.Price,
+                Description = p.Description,
                 Image = p.Image,
-                Description=p.Description
-            })
-            .FirstOrDefaultAsync();
+                IsActive = p.IsActive,
+                Stock = p.Stock,
+                CategoryName = c.Name
+            }
+        ).FirstOrDefaultAsync();
     }
 
+
+    // ========================= CREATE =========================
     public async Task<ProductResponseDto> CreateAsync(ProductCreateDto dto)
     {
         var category = await _context.Categories
@@ -64,19 +78,13 @@ public class ProductService : IProductService
         if (dto.Image != null)
         {
             var fileName = Guid.NewGuid() + Path.GetExtension(dto.Image.FileName);
+            var path = Path.Combine(_env.WebRootPath, "images", fileName);
 
-            var physicalPath = Path.Combine(
-                _env.WebRootPath,
-                "images",
-                fileName
-            );
-
-            using var stream = new FileStream(physicalPath, FileMode.Create);
+            using var stream = new FileStream(path, FileMode.Create);
             await dto.Image.CopyToAsync(stream);
 
             imageUrl = "/images/" + fileName;
         }
-
 
         var product = new Product
         {
@@ -84,7 +92,9 @@ public class ProductService : IProductService
             Price = dto.Price,
             Description = dto.Description,
             Image = imageUrl,
-            CategoryId = category.Id
+            CategoryId = category.Id,
+            IsActive = true,
+            Stock = dto.Stock
         };
 
         _context.Products.Add(product);
@@ -92,71 +102,48 @@ public class ProductService : IProductService
 
         return new ProductResponseDto
         {
-            Id=product.Id,
+            Id = product.Id,
             Name = product.Name,
             Price = product.Price,
             Description = product.Description,
             Image = product.Image,
-            CategoryName = category.Name
+            CategoryName = category.Name,
+            IsActive = product.IsActive,
+            Stock = product.Stock
         };
     }
 
-
+    // ========================= UPDATE DETAILS =========================
     public async Task<bool> UpdateAsync(int id, ProductUpdateDto dto)
     {
-        var product = await _context.Products
-            .Include(p => p.CategoryId)
-            .FirstOrDefaultAsync(p => p.Id == id);
-
+        var product = await _context.Products.FindAsync(id);
         if (product == null) return false;
 
-        // Find category by name
-        var category = await _context.Categories
-            .FirstOrDefaultAsync(c => c.Name == dto.CategoryName);
+        if (!string.IsNullOrWhiteSpace(dto.Name))
+            product.Name = dto.Name;
 
-        // Create category if it does not exist
-        if (category == null)
-        {
-            category = new Category
-            {
-                Name = dto.CategoryName
-            };
+        if (dto.Price.HasValue)
+            product.Price = dto.Price.Value;
 
-            _context.Categories.Add(category);
-            await _context.SaveChangesAsync();
-        }
+        if (!string.IsNullOrWhiteSpace(dto.Description))
+            product.Description = dto.Description;
 
         if (dto.Image != null)
         {
             var fileName = Guid.NewGuid() + Path.GetExtension(dto.Image.FileName);
+            var path = Path.Combine(_env.WebRootPath, "images", fileName);
 
-            var physicalPath = Path.Combine(
-                _env.WebRootPath,
-                "images",
-                fileName
-            );
-
-            using var stream = new FileStream(physicalPath, FileMode.Create);
+            using var stream = new FileStream(path, FileMode.Create);
             await dto.Image.CopyToAsync(stream);
 
             product.Image = "/images/" + fileName;
         }
 
-
-        // Update product fields
-        product.Name = dto.Name;
-        product.Price = dto.Price;
-        //product.Image = imageUrl;
-        product.Description = dto.Description;
-
-        // IMPORTANT: assign CategoryId, not string
-        product.CategoryId = category.Id;
-
         await _context.SaveChangesAsync();
         return true;
     }
 
-
+    // ========================= DELETE =========================
     public async Task<bool> DeleteAsync(int id)
     {
         var product = await _context.Products.FindAsync(id);

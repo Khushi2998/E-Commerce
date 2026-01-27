@@ -55,23 +55,46 @@ namespace ECommerce.Controllers
         [HttpPost]
         public async Task<IActionResult> Create(CategoryCreateDto dto)
         {
-            if (await _context.Categories.AnyAsync(c => c.Name == dto.Name))
+            Category category = null;
+
+            // CASE 1: Existing category selected
+            if (dto.CategoryId.HasValue)
             {
-                return BadRequest("Category already exists");
+                category = await _context.Categories
+                    .FindAsync(dto.CategoryId.Value);
+
+                if (category == null)
+                    return BadRequest("Invalid category");
             }
 
-            var category = new Category
+            // CASE 2: Other → create new
+            else if (!string.IsNullOrWhiteSpace(dto.NewCategoryName))
             {
-                Name = dto.Name
-            };
+                var existingCategory = await _context.Categories
+                    .FirstOrDefaultAsync(c =>
+                        c.Name.ToLower() == dto.NewCategoryName.ToLower());
 
-            _context.Categories.Add(category);
-            await _context.SaveChangesAsync();
+                if (existingCategory != null)
+                {
+                    category = existingCategory;
+                }
+                else
+                {
+                    category = new Category
+                    {
+                        Name = dto.NewCategoryName.Trim()
+                    };
 
-            return CreatedAtAction(nameof(GetById),
-                new { id = category.Id },
-                new CategoryResponseDto { Id = category.Id, Name = category.Name });
+                    _context.Categories.Add(category);
+                    await _context.SaveChangesAsync();
+                }
+            }
+            
+            
+            return BadRequest("Category is required");
         }
+
+        
 
         // Admin - Update category
         [Authorize(Roles = "Admin")]
@@ -81,7 +104,7 @@ namespace ECommerce.Controllers
             var category = await _context.Categories.FindAsync(id);
             if (category == null) return NotFound();
 
-            category.Name = dto.Name;
+            category.Name = dto.NewCategoryName;
             await _context.SaveChangesAsync();
 
             return NoContent();

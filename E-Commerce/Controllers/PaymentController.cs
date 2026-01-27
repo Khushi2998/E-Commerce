@@ -1,4 +1,7 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using ECommerce.Data;
+using ECommerce.DTOs;
+using ECommerce.Models;
+using ECommerce.Services;
 using Microsoft.AspNetCore.Mvc;
 using Razorpay.Api;
 using System.Security.Cryptography;
@@ -6,60 +9,104 @@ using System.Text;
 
 namespace ECommerce.Controllers
 {
-    [Route("api/[controller]")]
     [ApiController]
+    [Route("api/[controller]")]
     public class PaymentController : ControllerBase
     {
         private readonly IConfiguration _configuration;
-        public PaymentController(IConfiguration configuration)
+        private readonly AppDbContext _context;
+        private readonly InvoiceService _invoiceService;
+        public PaymentController(IConfiguration configuration, AppDbContext context, InvoiceService invoiceService)
         {
             _configuration = configuration;
+            _context = context;
+            _invoiceService = invoiceService;
         }
+
+        // ===============================
+        // CREATE RAZORPAY ORDER
+        // ===============================
         [HttpPost("create-order")]
-        public IActionResult CreateOrder([FromBody] dynamic data)
+        public IActionResult CreateOrder([FromBody] CheckoutResponseDto request)
         {
-            int amount = data.amount; // amount in rupees
+            var order = _context.Orders.Find(request.OrderId);
+            if (order == null)
+                return BadRequest("Order not found");
+
+            if (order.TotalAmount <= 0)
+                return BadRequest("Invalid order amount");
 
             RazorpayClient client = new RazorpayClient(
                 _configuration["Razorpay:Key"],
                 _configuration["Razorpay:Secret"]
             );
 
-            Dictionary<string, object> options = new Dictionary<string, object>();
-            options.Add("amount", amount * 100); // in paise
-            options.Add("currency", "INR");
-            options.Add("receipt", "order_rcptid_" + DateTime.Now.Ticks);
+            var options = new Dictionary<string, object>
+            {
+                { "amount", (int)(order.TotalAmount * 100) }, // rupees → paise
+                { "currency", "INR" },
+                { "receipt", $"order_{order.Id}" }
+            };
 
-            Order order = client.Order.Create(options);
+            var razorpayOrder = client.Order.Create(options);
 
-            return Ok(order.Attributes); // send order details to frontend
+            // VERY IMPORTANT: SAVE RAZORPAY ORDER ID
+            order.RazorpayOrderId = razorpayOrder.Attributes["id"].ToString();
+            _context.SaveChanges();
+
+            return Ok(new
+            {
+                razorpayOrderId = order.RazorpayOrderId,
+                amount = order.TotalAmount
+            });
         }
 
-        // 2️⃣ Verify Payment
+        // ===============================
+        // VERIFY PAYMENT
+        // ===============================
         [HttpPost("verify-payment")]
-        public IActionResult VerifyPayment([FromBody] dynamic data)
+        public async Task<IActionResult> VerifyPayment([FromBody] VerifyPaymentDto request)
         {
-            string orderId = data.razorpay_order_id;
-            string paymentId = data.razorpay_payment_id;
-            string signature = data.razorpay_signature;
+            // Debug logs (remove later)
+            Console.WriteLine("===== PAYMENT VERIFY =====");
+            Console.WriteLine($"OrderId: {request.OrderId}");
+            Console.WriteLine($"RazorpayOrderId: {request.RazorpayOrderId}");
+            Console.WriteLine($"RazorpayPaymentId: {request.RazorpayPaymentId}");
+            Console.WriteLine($"RazorpaySignature: {request.RazorpaySignature}");
 
-            string keySecret = _configuration["Razorpay:Secret"];
-            string payload = orderId + "|" + paymentId;
+            var order = _context.Orders.Find(request.OrderId);
+            if (order == null)
+                return BadRequest("Order not found");
 
-            using (var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(keySecret)))
+            // Signature verification
+            string payload = $"{request.RazorpayOrderId}|{request.RazorpayPaymentId}";
+            string secret = _configuration["Razorpay:Secret"];
+
+            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secret));
+            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(payload));
+            var generatedSignature = BitConverter
+                .ToString(hash)
+                .Replace("-", "")
+                .ToLower();
+
+            if (generatedSignature != request.RazorpaySignature)
+                return BadRequest("Payment verification failed");
+
+            // PAYMENT SUCCESS
+            order.Status = OrderStatus.Placed;
+            order.RazorpayOrderId = request.RazorpayOrderId;
+            order.RazorpayPaymentId = request.RazorpayPaymentId;
+            order.PaidAt = DateTime.UtcNow;
+
+            _context.SaveChanges();
+            var invoice = await _invoiceService.CreateInvoice(order.Id, order.CustomerId);
+
+            return Ok(new
             {
-                var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(payload));
-                var generatedSignature = BitConverter.ToString(hash).Replace("-", "").ToLower();
-
-                if (generatedSignature == signature)
-                {
-                    return Ok(new { status = "success" });
-                }
-                else
-                {
-                    return BadRequest(new { status = "failure" });
-                }
-            }
+                message = "Payment verified successfully",
+                orderId = order.Id,
+                invoiceId=invoice.Id
+            });
         }
     }
 }

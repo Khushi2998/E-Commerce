@@ -21,10 +21,18 @@ namespace ECommerce.Data
         public DbSet<InvoiceItem> InvoiceItems { get; set; }
         public DbSet<FAQ> FAQs { get; set; }
         public DbSet<AuthTable> Auth { get; set; }
-        public DbSet<Role> Roles { get; set; }
+        public DbSet<Wishlist> Wishlists { get; set; }
+     
+
+    public DbSet<Role> Roles { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<Order>()
+                        .Property(o => o.Status)
+                        .HasConversion<int>();
+
             modelBuilder.Entity<Role>().HasData(
             new Role { RoleId = 1, RoleName = "Admin" },
             new Role { RoleId = 2, RoleName = "User" }

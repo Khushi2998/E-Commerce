@@ -15,8 +15,22 @@ public class ProductController : ControllerBase
     {
         _context = context;
     }
+    [HttpGet("search")]
+    public async Task<IActionResult> Search(string query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+            return Ok(new List<Product>());
 
-    // PUBLIC – CUSTOMER
+        var q = query.ToLower();
+        var products = await _context.Products
+            .Where(p => (p.Name != null && p.Name.ToLower().Contains(q)) ||
+            (p.Description != null && p.Description.ToLower().Contains(q)))
+        .ToListAsync();
+
+        return Ok(products);
+    }
+
+
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
@@ -53,13 +67,30 @@ public class ProductController : ControllerBase
         return Ok(product);
     }
 
-    // 🔐 ADMIN ONLY
+ 
     [Authorize(Roles = "Admin")]
     [HttpPost]
     public async Task<IActionResult> Create([FromForm] ProductCreateDto dto)
     {
-        string? imageUrl = null;
+        if (string.IsNullOrWhiteSpace(dto.CategoryName))
+            return BadRequest("Category is required");
+        var category = await _context.Categories
+            .FirstOrDefaultAsync(c =>
+            c.Name.ToLower() == dto.CategoryName.Trim().ToLower()
+        );
 
+        if (category == null)
+        {
+            category = new Category
+            {
+                Name = dto.CategoryName.Trim()
+            };
+
+            _context.Categories.Add(category);
+            await _context.SaveChangesAsync();
+        }
+
+        string? imageUrl = null;
         if (dto.Image != null)
         {
             var fileName = Guid.NewGuid() + Path.GetExtension(dto.Image.FileName);
@@ -71,21 +102,22 @@ public class ProductController : ControllerBase
             imageUrl = "/images/" + fileName;
         }
 
+       
         var product = new Product
         {
             Name = dto.Name,
             Price = dto.Price,
-            Description = dto.Description,
+            CategoryId = category.Id,
             Image = imageUrl
         };
 
         _context.Products.Add(product);
         await _context.SaveChangesAsync();
 
-        return Ok(product);
+        return Ok(new { Message = "Product created", ProductId = product.Id });
     }
 
-    // 🔐 ADMIN ONLY
+
     [Authorize(Roles = "Admin")]
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(int id, [FromForm] ProductUpdateDto dto)
@@ -93,6 +125,7 @@ public class ProductController : ControllerBase
         var product = await _context.Products.FindAsync(id);
         if (product == null) return NotFound();
 
+        // Image update
         if (dto.Image != null)
         {
             if (!string.IsNullOrEmpty(product.Image))
@@ -111,15 +144,26 @@ public class ProductController : ControllerBase
             product.Image = "/images/" + fileName;
         }
 
-        product.Name = dto.Name;
-        product.Price = dto.Price;
-        product.Description = dto.Description;
+        // Partial updates (SAFE)
+        if (dto.Name != null)
+            product.Name = dto.Name;
+
+        if (dto.Price.HasValue)
+            product.Price = dto.Price.Value;
+
+        if (dto.Description != null)
+            product.Description = dto.Description;
+
+        if (dto.IsActive.HasValue)
+            product.IsActive = dto.IsActive.Value;
+
+        if (dto.Stock.HasValue)
+            product.Stock = dto.Stock.Value;
 
         await _context.SaveChangesAsync();
         return Ok(product);
     }
 
-    // ADMIN ONLY
     [Authorize(Roles = "Admin")]
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
