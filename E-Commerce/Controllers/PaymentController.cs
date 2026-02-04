@@ -3,6 +3,7 @@ using ECommerce.DTOs;
 using ECommerce.Models;
 using ECommerce.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Razorpay.Api;
 using System.Security.Cryptography;
 using System.Text;
@@ -61,20 +62,14 @@ namespace ECommerce.Controllers
             });
         }
 
-        // ===============================
-        // VERIFY PAYMENT
-        // ===============================
+ 
         [HttpPost("verify-payment")]
         public async Task<IActionResult> VerifyPayment([FromBody] VerifyPaymentDto request)
         {
-            // Debug logs (remove later)
-            Console.WriteLine("===== PAYMENT VERIFY =====");
-            Console.WriteLine($"OrderId: {request.OrderId}");
-            Console.WriteLine($"RazorpayOrderId: {request.RazorpayOrderId}");
-            Console.WriteLine($"RazorpayPaymentId: {request.RazorpayPaymentId}");
-            Console.WriteLine($"RazorpaySignature: {request.RazorpaySignature}");
+            var order = _context.Orders
+                .Include(o => o.OrderItems) // include OrderItems
+                .FirstOrDefault(o => o.Id == request.OrderId);
 
-            var order = _context.Orders.Find(request.OrderId);
             if (order == null)
                 return BadRequest("Order not found");
 
@@ -92,21 +87,29 @@ namespace ECommerce.Controllers
             if (generatedSignature != request.RazorpaySignature)
                 return BadRequest("Payment verification failed");
 
-            // PAYMENT SUCCESS
-            order.Status = OrderStatus.Placed;
+            // PAYMENT SUCCESS — update each OrderItem
+            foreach (var item in order.OrderItems)
+            {
+                item.Status = OrderItemStatus.Placed; //  update OrderItem status
+            }
+
+            // Update payment info in Order
             order.RazorpayOrderId = request.RazorpayOrderId;
             order.RazorpayPaymentId = request.RazorpayPaymentId;
             order.PaidAt = DateTime.UtcNow;
 
-            _context.SaveChanges();
+            await _context.SaveChangesAsync();
+
             var invoice = await _invoiceService.CreateInvoice(order.Id, order.CustomerId);
 
             return Ok(new
             {
                 message = "Payment verified successfully",
                 orderId = order.Id,
-                invoiceId=invoice.Id
+                invoiceId = invoice.Id
             });
         }
+
     }
+
 }

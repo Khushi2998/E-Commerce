@@ -161,7 +161,8 @@ namespace ECommerce.Controllers
                 .Select(c => new CategoryResponseDto
                 {
                     Id = c.Id,
-                    Name = c.Name
+                    Name = c.Name,
+                    IsActive=c.IsActive
                 })
                 .ToListAsync();
 
@@ -209,27 +210,16 @@ namespace ECommerce.Controllers
         }
 
         [HttpPut("categories/{id}")]
-        public async Task<IActionResult> UpdateCategory(int id, [FromBody] Category category)
+        public async Task<IActionResult> UpdateCategory(int id, CategoryUpdateDto dto)
         {
             var existing = await _context.Categories.FindAsync(id);
             if (existing == null) return NotFound();
 
-            existing.Name = category.Name;
+            existing.Name = dto.Name;
+            existing.IsActive = dto.IsActive;
             await _context.SaveChangesAsync();
             return Ok(new { Message = "Category updated", CategoryId = existing.Id });
         }
-
-        [HttpDelete("categories/{id}")]
-        public async Task<IActionResult> DeleteCategory(int id)
-        {
-            var existing = await _context.Categories.FindAsync(id);
-            if (existing == null) return NotFound();
-
-            _context.Categories.Remove(existing);
-            await _context.SaveChangesAsync();
-            return Ok(new { Message = "Category deleted" });
-        }
-
         
         [HttpGet("feedback")]
         public async Task<IActionResult> GetFeedback()
@@ -276,19 +266,21 @@ namespace ECommerce.Controllers
                                     CustomerName = c.Name,
                                     CustomerEmail = c.Email,
                                     TotalAmount = o.TotalAmount,
-                                    Status = (int)o.Status,
                                     CreatedAt = o.CreatedAt,
-                                    Items = _context.OrderItems
-                                        .Where(oi => oi.OrderId == o.Id)
-                                        .Select(oi => new
-                                        {
-                                            ProductId = oi.ProductId,
-                                            Quantity = oi.Quantity,
-                                            Price = oi.Price
-                                        })
-                                        .ToList()
-                                })
-                                .ToListAsync();
+                                    Items = (from oi in _context.OrderItems
+                                             join p in _context.Products on oi.ProductId equals p.Id
+                                             where oi.OrderId == o.Id
+                                             select new
+                                             {
+                                                 ItemId=oi.Id,
+                                                 ProductId = oi.ProductId,
+                                                 ProductName = p.Name,
+                                                 ProductImage = p.Image, 
+                                                 Quantity = oi.Quantity,
+                                                 Price = oi.Price,
+                                                 Status = oi.Status
+                                             }).ToList()
+                                }).ToListAsync();
 
             return Ok(orders);
         }
@@ -298,18 +290,29 @@ namespace ECommerce.Controllers
             public int Status { get; set; }
         }
 
-        [HttpPut("orders/{orderId}/status")]
-        public async Task<IActionResult> UpdateStatus(int orderId,[FromBody] UpdateOrderStatusDto dto)
+        [HttpPut("orders/items/{orderItemId}/status")]
+        public async Task<IActionResult> UpdateItemStatus(int orderItemId,[FromBody] UpdateOrderStatusDto dto)
         {
-            var order = await _context.Orders.FindAsync(orderId);
-            if (order == null)
-                return NotFound("Order not found");
+            var item = await _context.OrderItems
+                .Include(oi => oi.Order)
+                .FirstOrDefaultAsync(oi => oi.Id == orderItemId);
 
-            order.Status = (OrderStatus)dto.Status;
+            if (item == null)
+                return NotFound("Order item not found");
+
+            //  Convert int → enum safely
+            if (!Enum.IsDefined(typeof(OrderItemStatus), dto.Status))
+                return BadRequest("Invalid status");
+
+            item.Status = (OrderItemStatus)dto.Status;
 
             await _context.SaveChangesAsync();
 
-            return Ok(new { orderId, status = (int)dto.Status });
+            return Ok(new
+            {
+                orderItemId,
+                status = item.Status.ToString()
+            });
         }
 
     }

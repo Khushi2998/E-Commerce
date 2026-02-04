@@ -43,11 +43,20 @@ public class CheckoutController : ControllerBase
 
         if (!cartItems.Any())
             return BadRequest("Cart is empty");
+        foreach (var item in cartItems)
+        {
+            var product = await _context.Products.FindAsync(item.ProductId);
+
+            if (product.Stock < item.Quantity)
+                return BadRequest($"{product.Name} is out of stock");
+
+            product.Stock -= item.Quantity; 
+        }
         var subTotal = cartItems.Sum(i => i.Price * i.Quantity);
-        var tax = subTotal * 0.18m;
+        var tax = subTotal * 0.08m;
         var total = subTotal + tax;
 
-        var shippingAddress = $@"
+        var ShippingAddress = $@"
         Name: {dto.FullName}
         Phone: {dto.Phone}
         Address: {dto.AddressLine}
@@ -64,8 +73,7 @@ public class CheckoutController : ControllerBase
             Tax = tax,
             TotalAmount = total,
             PaymentMethod = dto.PaymentMethod,
-            Status = OrderStatus.Pending,
-            ShippingAddress = dto.AddressLine,
+            ShippingAddress = dto.AddressLine
         };
 
         _context.Orders.Add(order);
@@ -75,6 +83,7 @@ public class CheckoutController : ControllerBase
         {
             OrderId = order.Id,
             ProductId = i.ProductId,
+            Status = OrderItemStatus.Placed,
             Quantity = i.Quantity,
             Price = i.Price
         }).ToList();

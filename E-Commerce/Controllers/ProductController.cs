@@ -19,55 +19,75 @@ public class ProductController : ControllerBase
     public async Task<IActionResult> Search(string query)
     {
         if (string.IsNullOrWhiteSpace(query))
-            return Ok(new List<Product>());
+            return Ok(new List<object>());
 
         var q = query.ToLower();
         var products = await _context.Products
-            .Where(p => (p.Name != null && p.Name.ToLower().Contains(q)) ||
-            (p.Description != null && p.Description.ToLower().Contains(q)))
-        .ToListAsync();
+    .Join(
+        _context.Categories.Where(c => c.IsActive),
+        p => p.CategoryId,
+        c => c.Id,
+        (p, c) => new { Product = p, Category = c }
+    )
+    .Where(pc => (pc.Product.IsActive ?? true) &&
+                 ((pc.Product.Name != null && pc.Product.Name.ToLower().Contains(q)) ||
+                  (pc.Product.Description != null && pc.Product.Description.ToLower().Contains(q))))
+    .Select(pc => new
+    {
+        pc.Product.Id,
+        pc.Product.Name,
+        pc.Product.Price,
+        pc.Product.Description,
+        pc.Product.Image,
+        pc.Product.Stock
+    })
+    .ToListAsync();
 
         return Ok(products);
     }
-
 
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
-        var products = await _context.Products
-            .Select(p => new
-            {
-                p.Id,
-                p.Name,
-                p.Price,
-                p.Description,
-                p.Image
-            })
-            .ToListAsync();
+        var products = await (from p in _context.Products
+                              join c in _context.Categories
+                                  on p.CategoryId equals c.Id
+                              where (p.IsActive ?? true) && c.IsActive
+                              select new
+                              {
+                                  p.Id,
+                                  p.Name,
+                                  p.Price,
+                                  p.Description,
+                                  p.Image,
+                                  p.Stock
+                              })
+                             .ToListAsync();
 
         return Ok(products);
     }
-
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
     {
-        var product = await _context.Products
-            .Where(p => p.Id == id)
-            .Select(p => new
-            {
-                p.Id,
-                p.Name,
-                p.Price,
-                p.Description,
-                p.Image
-            })
-            .FirstOrDefaultAsync();
+        var product = await (from p in _context.Products
+                             join c in _context.Categories
+                                 on p.CategoryId equals c.Id
+                             where p.Id == id && (p.IsActive ?? true) && c.IsActive
+                             select new
+                             {
+                                 p.Id,
+                                 p.Name,
+                                 p.Price,
+                                 p.Description,
+                                 p.Image,
+                                 p.Stock
+                             })
+                            .FirstOrDefaultAsync();
 
         if (product == null) return NotFound();
         return Ok(product);
     }
 
- 
     [Authorize(Roles = "Admin")]
     [HttpPost]
     public async Task<IActionResult> Create([FromForm] ProductCreateDto dto)
@@ -108,7 +128,8 @@ public class ProductController : ControllerBase
             Name = dto.Name,
             Price = dto.Price,
             CategoryId = category.Id,
-            Image = imageUrl
+            Image = imageUrl,
+            Stock=dto.Stock
         };
 
         _context.Products.Add(product);

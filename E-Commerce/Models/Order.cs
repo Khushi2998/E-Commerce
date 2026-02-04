@@ -20,12 +20,12 @@ namespace ECommerce.Models
 
         // FK
         public int CustomerId { get; set; }
-        public string PaymentMethod { get; set; }
-        public OrderStatus Status { get; set; } = OrderStatus.Pending;
+        public string PaymentMethod { get; set; } = "COD";
         public string ShippingAddress { get; set; }
         public string? RazorpayOrderId { get; set; }
         public string? RazorpayPaymentId { get; set; }
         public DateTime? PaidAt { get; set; }
+        public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
 
     }
 }

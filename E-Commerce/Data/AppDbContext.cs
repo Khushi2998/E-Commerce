@@ -28,15 +28,22 @@ namespace ECommerce.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
-
-            modelBuilder.Entity<Order>()
-                        .Property(o => o.Status)
+            modelBuilder.Entity<OrderItem>()
+                        .Property(oi => oi.Status)
                         .HasConversion<int>();
+            modelBuilder.Entity<Order>()
+                        .HasMany(o => o.OrderItems)
+                        .WithOne(oi => oi.Order)
+                        .HasForeignKey(oi => oi.OrderId)
+                        .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Role>().HasData(
             new Role { RoleId = 1, RoleName = "Admin" },
             new Role { RoleId = 2, RoleName = "User" }
             );
+
+         
         }
+       
     }
 }

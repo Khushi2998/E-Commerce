@@ -39,8 +39,12 @@ namespace ECommerce.Controllers
             {
                 customer.Id,
                 customer.Name,
-                customer.Email
-               
+                customer.Email,
+                customer.Contact,
+                customer.Address,
+                customer.City,
+                customer.State,
+                customer.Pincode
             });
         }
 
@@ -59,7 +63,9 @@ namespace ECommerce.Controllers
             customer.Name = dto.Name;
             customer.Contact = dto.Contact;
             customer.Address = dto.Address;
-
+            customer.City=dto.City;
+            customer.State=dto.State;
+            customer.Pincode=dto.Pincode;
             await _context.SaveChangesAsync();
             return Ok(customer);
         }
@@ -73,40 +79,101 @@ namespace ECommerce.Controllers
             var orders = await _context.Orders
                 .Where(o => o.CustomerId == userId)
                 .OrderByDescending(o => o.CreatedAt)
+                .Select(o => new
+                {
+                    id = o.Id,
+                    totalAmount = o.TotalAmount,
+                    createdAt = o.CreatedAt,
+                    paymentMethod=o.PaymentMethod,
+                    items = (
+                        from oi in _context.OrderItems
+                        join p in _context.Products
+                            on oi.ProductId equals p.Id
+                        where oi.OrderId == o.Id
+                        select new
+                        {
+                            name = p.Name,
+                            quantity = oi.Quantity,
+                            price = oi.Price,
+                            image = p.Image
+                        }
+                    ).ToList()
+                })
                 .ToListAsync();
 
-
-            var result = orders.Select(o => new
-            {
-                o.Id,
-                o.TotalAmount,
-                Status = o.Status.ToString(),
-                o.CreatedAt
-            });
-                
-
-            return Ok(result);
+            return Ok(orders);
         }
 
+
+
+      
         [Authorize]
         [HttpGet("orders/{orderId}")]
-        public async Task<IActionResult> OrderDetails(int orderId)
+        public async Task<IActionResult> MyOrderById(int orderId)
         {
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
 
             var order = await _context.Orders
-                 .FirstOrDefaultAsync(o => o.Id == orderId && o.CustomerId == userId);
-            if (order == null) return NotFound();
-            return Ok(new
-            {
-                order.Id,
-                Status = order.Status.ToString(),
-                order.ShippingAddress,
-                order.TotalAmount,
-                order.CreatedAt
-            });
+                .Where(o => o.Id == orderId && o.CustomerId == userId)
+                .Select(o => new
+                {
+                    id = o.Id,
+                    totalAmount = o.TotalAmount,
+                    createdAt = o.CreatedAt,
+                    paymentMethod = o.PaymentMethod,
+                    shippingAddress = o.ShippingAddress,
+
+                    items = (
+                        from oi in _context.OrderItems
+                        join p in _context.Products
+                            on oi.ProductId equals p.Id
+                        where oi.OrderId == o.Id
+                        select new
+                        {
+                            itemId = oi.Id,       
+                            productId = p.Id,
+                            name = p.Name,
+                            quantity = oi.Quantity,
+                            price = oi.Price,
+                            status = oi.Status.ToString(),
+                            image = p.Image
+                        }
+                    ).ToList()
+                })
+                .FirstOrDefaultAsync();
+
+            if (order == null)
+                return NotFound(new { message = "Order not found" });
+
+            return Ok(order);
         }
 
+        [HttpPost("orders/items/{orderItemId}/cancel")]
+        public async Task<IActionResult> CancelItem(int orderItemId)
+        {
+            var item = await _context.OrderItems
+                .Join(_context.Products,
+                    oi => oi.ProductId,
+                    p => p.Id,
+                    (oi, p) => new { oi, p })
+                .FirstOrDefaultAsync(x => x.oi.Id == orderItemId);
+
+            if (item == null)
+                return NotFound();
+
+            //  Cannot cancel after delivery
+            if (item.oi.Status == OrderItemStatus.Delivered)
+                return BadRequest("Delivered items cannot be cancelled");
+
+            item.oi.Status = OrderItemStatus.Cancelled;
+
+            //  Restore stock
+            item.p.Stock += item.oi.Quantity;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Item cancelled and stock restored" });
+        }
 
     }
 }

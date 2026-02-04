@@ -46,7 +46,7 @@ namespace ECommerce.Controllers
         }
 
         [HttpGet("count")]
-        [Authorize(Roles ="Customer")]
+        [Authorize(Roles ="User")]
         public async Task<IActionResult>GetCartCount()
         {
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));

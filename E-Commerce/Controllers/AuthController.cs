@@ -23,7 +23,7 @@ public class AuthController : ControllerBase
         }
         catch (InvalidOperationException ex) when (ex.Message == "EMAIL_EXISTS")
         {
-            return Conflict(new { message = "Email already registered" });
+            return Conflict(new { code = "EMAIL_EXISTS", message = "Email already registered" });
         }
         catch (Exception)
         {
@@ -34,6 +34,9 @@ public class AuthController : ControllerBase
     [Consumes("application/json")]
     public async Task<IActionResult> Login([FromBody] LoginDto dto)
     {
+        //if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+        //    return Redirect(returnUrl);
+        //return RedirectToAction("Profile", "Account");
         if (dto == null)
             return BadRequest("DTO IS NULL");
 
@@ -43,5 +46,6 @@ public class AuthController : ControllerBase
             return Unauthorized("Invalid email or password");
 
         return Ok(result);
+        
     }
 }

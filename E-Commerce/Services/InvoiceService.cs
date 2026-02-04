@@ -32,7 +32,7 @@ namespace ECommerce.Services
                 throw new Exception("No order items found");
 
             var subTotal = orderItems.Sum(i => i.Price * i.Quantity);
-            var tax = subTotal * 0.18m;
+            var tax = subTotal * 0.08m;
             var total = subTotal + tax;
 
             var invoice = new Invoice

@@ -20,7 +20,7 @@ namespace ECommerce.Models
         public decimal Price { get; set; }
         public string? Image { get; set; }
         public int Stock { get; set; }
-        public bool IsActive { get; set; } = true;
+        public bool? IsActive { get; set; } = true;
 
         // FK
         public int CategoryId { get; set; }
