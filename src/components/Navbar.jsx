@@ -1,67 +1,91 @@
-import React, { useContext, useState, useEffect,useRef } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import React, { useContext, useEffect, useRef, useState } from "react";
+import { NavLink, useNavigate,useLocation } from "react-router-dom";
+import { getCartCount } from "../api/cartApi";
 import { FaShoppingCart, FaHome, FaRegHeart } from "react-icons/fa";
 import { CgProfile } from "react-icons/cg";
 import { AuthContext } from "./AuthContext";
 import { CartContext } from "./CartContext";
 import { getWishlistFromDb } from "../api/wishlistapi";
-import { getWishlist } from "../admin/WishlistStorage";
 
 const Navbar = () => {
   const { user, logout } = useContext(AuthContext);
-  const { cartCount, fetchCartCount } = useContext(CartContext);
-  const menuRef=useRef(null);
+  const { cartCount,fetchCartCount } = useContext(CartContext);
+  const navigate = useNavigate();
+  const Location=useLocation();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [wishlistCount, setWishlistCount] = useState(0);
 
-  const navigate = useNavigate();
-  const isLoggedIn = !!localStorage.getItem("token");
+  const menuRef = useRef(null);
+  const typingRef = useRef(false);
+  const searchTimeout = useRef(null);
 
-  /* 🔍 Search debounce */
+  const isLoggedIn = !!user;
+  const isAdmin = user?.role === "Admin";
+
+  /* ---------------- SEARCH ---------------- */
+  const handleSearchChange = (e) => {
+    typingRef.current = true;
+    setSearch(e.target.value);
+  };
+
   useEffect(() => {
-    if (!search.trim()) return;
+    if (!typingRef.current) return; // only run when user types
 
-    const timer = setTimeout(() => {
-      navigate(`/search?query=${search}`);
-    }, 500);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
 
-    return () => clearTimeout(timer);
+    const q = search.trim();
+
+    searchTimeout.current = setTimeout(() => {
+      if (q.length > 0) {
+        navigate(`/search?query=${encodeURIComponent(q)}`, { replace: true });
+      }
+    }, 400);
+
+    return () => clearTimeout(searchTimeout.current);
   }, [search, navigate]);
 
   useEffect(() => {
-  const handleClickOutside = (e) => {
-    if (menuRef.current && !menuRef.current.contains(e.target)) {
-      setOpen(false);
-    }
-  };
+    fetchCartCount();
 
-  document.addEventListener("mousedown", handleClickOutside);
-  return () => {
-    document.removeEventListener("mousedown", handleClickOutside);
-  };
-}, []);
+    const handler = () => fetchCartCount();
+
+    window.addEventListener("cartUpdated", handler);
+
+    return () => window.removeEventListener("cartUpdated", handler);
+  }, []);
 
 
-  /* 🛒 Cart count */
+  /* ---------------- DROPDOWN ---------------- */
   useEffect(() => {
-    if (user) fetchCartCount();
-  }, [user, fetchCartCount]);
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-  /* ❤️ Wishlist count */
+  /* ---------------- WISHLIST ---------------- */
   useEffect(() => {
-    const loadWishlistCount = async () => {
-      if (isLoggedIn) {
+    if (!isLoggedIn) return setWishlistCount(0);
+
+    const loadWishlist = async () => {
+      try {
         const res = await getWishlistFromDb();
         setWishlistCount(res.data.length);
-      } else {
-        setWishlistCount(getWishlist().length);
+      } catch {
+        setWishlistCount(0);
       }
     };
 
-    loadWishlistCount();
+    loadWishlist();
+
+    const reload = () => loadWishlist();
+    window.addEventListener("wishlistUpdated", reload);
+    return () => window.removeEventListener("wishlistUpdated", reload);
   }, [isLoggedIn]);
 
+  /* ---------------- LOGOUT ---------------- */
   const handleLogout = () => {
     setOpen(false);
     logout();
@@ -70,85 +94,67 @@ const Navbar = () => {
 
   return (
     <nav className="navbar">
-      <div className="logo">
+      {/* Logo */}
+      <div className="logo" onClick={() => navigate("/")}>
         <img src="/logo.png" alt="logo" />
       </div>
 
-      <form
-        className="nav-search"
-        onSubmit={(e) => e.preventDefault()}
-      >
+      {/* Search */}
+      <form className="nav-search" onSubmit={(e) => e.preventDefault()}>
         <input
           type="text"
           placeholder="Search products..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={handleSearchChange}
         />
         <button type="submit">🔍</button>
       </form>
 
+      {/* Navigation Links */}
       <ul className="nav-links">
         <li>
-          <NavLink to="/">
-            <FaHome />
-          </NavLink>
+          <NavLink to="/"><FaHome /></NavLink>
         </li>
 
-        {!user ? (
+        {!isLoggedIn ? (
           <>
-            <li><NavLink to="/login">Login</NavLink></li>
+            <li><NavLink to="/login" state={{ from: location.pathname }}>Login</NavLink></li>
             <li><NavLink to="/register">Register</NavLink></li>
           </>
         ) : (
           <li className="profile-menu" ref={menuRef}>
-            <button
-              type="button"
-              className="profile-trigger"
-              onClick={() => setOpen((prev) => !prev)}
-            >
+            <button onClick={() => setOpen(!open)}>
               <CgProfile />
               <span>{user.name}</span>
             </button>
 
             {open && (
               <div className="dropdown">
-                <NavLink to="/profile" onClick={() => setOpen(false)}>
-                  My Profile
-                </NavLink>
-
-                <NavLink to="/orders" onClick={() => setOpen(false)}>
-                  My Orders
-                </NavLink>
-
-                {user.role === "Admin" && (
-                  <NavLink
-                    to="/dashboard/products"
-                    onClick={() => setOpen(false)}
-                  >
-                    Admin Panel
-                  </NavLink>
-                )}
-
+                <NavLink to="/profile" onClick={() => setOpen(false)}>My Profile</NavLink>
+                <NavLink to="/orders" onClick={() => setOpen(false)}>My Orders</NavLink>
+                {isAdmin && <NavLink to="/dashboard/products" onClick={() => setOpen(false)}>Admin Panel</NavLink>}
                 <button onClick={handleLogout}>Logout</button>
               </div>
             )}
           </li>
         )}
 
-        <li>
-          <NavLink to="/wishlist" className="wishlist">
-            <FaRegHeart />
-            </NavLink>
-        </li>
-
-        <li>
-          <NavLink to="/cart" className="cart">
-            <FaShoppingCart />
-            {cartCount > 0 && (
-              <span className="cart-badge">{cartCount}</span>
-            )}
-          </NavLink>
-        </li>
+        {!isAdmin && (
+          <>
+            <li>
+              <NavLink to="/wishlist" className="wishlist">
+                <FaRegHeart />
+                {wishlistCount > 0 && <span className="cart-badge">{wishlistCount}</span>}
+              </NavLink>
+            </li>
+            <li>
+              <NavLink to="/cart" className="cart">
+                <FaShoppingCart />
+                {isLoggedIn && cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
+              </NavLink>
+            </li>
+          </>
+        )}
       </ul>
     </nav>
   );

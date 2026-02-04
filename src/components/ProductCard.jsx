@@ -1,81 +1,165 @@
-import { useNavigate } from "react-router-dom";
-import { addToCart } from "../api/cartApi";
+import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
-import { FaHeart, FaRegHeart } from "react-icons/fa";
-import { addWishlist, removeWishlist, getWishlist } from "../admin/WishlistStorage";
+import { FaHeart, FaRegHeart, FaCartPlus } from "react-icons/fa";
+import { FiPlus,FiMinus } from "react-icons/fi";
 import { saveWishlist, removeWishlistItem } from "../api/wishlistapi";
-import { useEffect, useState, useContext } from "react";
+import { useContext, useState } from "react";
 import { CartContext } from "./CartContext";
-import { FaCartPlus } from "react-icons/fa";
-import { FiPlus } from "react-icons/fi";
+import { AuthContext } from "./AuthContext";
+import {updateCartItem,removeCartItem} from "../api/cartApi";
 
 export default function ProductCard({ product }) {
   const navigate = useNavigate();
-  const [added, setAdded] = useState(false);
+  const location = useLocation();
+
+  const { user } = useContext(AuthContext);
+  const { addToCart, fetchCartCount } = useContext(CartContext);
+
+  const isLoggedIn = !!user;
+  const isAdmin = user?.role === "Admin";
+
   const [liked, setLiked] = useState(false);
-  const { fetchCartCount, setCartCount } = useContext(CartContext);
-  const isLoggedIn = !!localStorage.getItem("token");
+  const [added, setAdded] = useState(false);
+  const [quantity, setQuantity] = useState(0);
 
-  useEffect(() => {
-    setLiked(getWishlist().includes(product.id));
-  }, [product.id]);
+  const openDetails = () => navigate(`/products/${product.id}`);
 
-  const openDetails = () => {
-    navigate(`/products/${product.id}`);
-  };
-
+  /* ================= WISHLIST ================= */
   const toggleWishlist = async () => {
-    if (liked) {
-      isLoggedIn ? await removeWishlistItem(product.id) : removeWishlist(product.id);
-    } else {
-      isLoggedIn ? await saveWishlist([product.id]) : addWishlist(product.id);
+    if (!isLoggedIn) {
+      toast.info("Please login to use wishlist");
+
+      sessionStorage.setItem(
+        "postLoginAction",
+        JSON.stringify({
+          from: location.pathname,
+          action: { type: "addToWishlist", productId: product.id }
+        })
+      );
+
+      navigate("/login");
+      return;
     }
-    setLiked(!liked);
+
+    try {
+      if (liked) {
+        await removeWishlistItem(product.id);
+        toast.info("Removed from wishlist");
+      } else {
+        await saveWishlist([product.id]);
+        toast.success("Added to wishlist ❤️");
+      }
+      setLiked(!liked);
+      window.dispatchEvent(new Event("wishlistUpdated"));
+    } catch {
+      toast.error("Wishlist action failed");
+    }
   };
 
+  /* ================= CART ================= */
   const handleAdd = async () => {
+    if (!isLoggedIn) {
+      sessionStorage.setItem(
+        "postLoginAction",
+        JSON.stringify({
+          from: location.pathname,
+          action: { type: "addToCart", productId: product.id, qty: 1 }
+        })
+      );
+      navigate("/login");
+      return;
+    }
+
     try {
       await addToCart(product.id, 1);
-      setCartCount((prev) => prev + 1);
-      fetchCartCount();
       setAdded(true);
+      setQuantity(q => q + 1);
+      fetchCartCount();
       toast.success("Added to cart");
-    } catch (err) {
-      if (err.response?.status === 401) {
-        navigate("/login", { state: { from: `/products/${product.id}` } });
-      } else {
-        console.error(err);
-      }
+    } catch {
+      toast.error("Failed to add to cart");
     }
   };
+  const handleDecrease = async () => {
+  if (quantity <= 1) {
+    try {
+      await removeCartItem(product.id);
+      setQuantity(0);
+      fetchCartCount();
+      toast.info("Removed from cart");
+    } catch {
+      toast.error("Failed to remove item");
+    }
+    return;
+  }
+
+  try {
+    await updateCartItem(product.id, quantity - 1);
+    setQuantity(q => q - 1);
+    fetchCartCount();
+  } catch {
+    toast.error("Failed to decrease quantity");
+  }
+};
 
   return (
     <div className="product-card">
+
+      {/* IMAGE + WISHLIST */}
       <div className="image-wrapper" onClick={openDetails}>
         <img
           src={`http://localhost:5253${product.image}`}
           alt={product.name}
           onError={(e) => (e.target.src = "/placeholder.webp")}
         />
-      </div>
 
-      <div className="product-info">
-        <h3 onClick={openDetails} className="clickable">{product.name}</h3>
-        <p className="price">₹{product.price}</p>
-
-        <div className="product-actions">
-          <button onClick={toggleWishlist} className={`wishlist-btn ${liked ? "liked" : ""}`}>
+        {!isAdmin && (
+          <button
+            className={`wishlist-floating ${liked ? "liked" : ""}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleWishlist();
+            }}
+          >
             {liked ? <FaHeart /> : <FaRegHeart />}
           </button>
+        )}
+      </div>
 
-          <button
-  className={`cart-btn ${added ? "added" : ""}`}
-  onClick={handleAdd}
-  title={added ? "Add more" : "Add to cart"}
->
-  {added ? <FiPlus size={18} /> : <FaCartPlus size={18} />}
-</button>
-        </div>
+      {/* INFO */}
+      <div className="product-info">
+        <h3 className="product-name" onClick={openDetails}>
+          {product.name}
+        </h3>
+
+        {isAdmin && (
+          <p className={`stock ${product.stock > 0 ? "in" : "out"}`}>
+            Stock: {product.stock}
+          </p>
+        )}
+
+        {!isAdmin && (
+          <div className="product-bottom">
+            <span className="price">₹{product.price}</span>
+            {quantity === 0 ? (
+    <button className="cart-btn" onClick={handleAdd}>
+      <FaCartPlus size={18} />
+    </button>
+  ) : (
+    <div className="qty-controller">
+      {/* <button onClick={handleDecrease}>
+        <FiMinus />
+      </button> */}
+
+      <span className="qty">{quantity}</span>
+
+      <button onClick={handleAdd}>
+        <FiPlus />
+      </button>
+    </div>
+  )}
+          </div>
+        )}
       </div>
     </div>
   );

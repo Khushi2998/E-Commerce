@@ -7,7 +7,7 @@ import Footer from "./Pages/Footer";
 import Home from "./Pages/Home";
 import ProductDetails from "./Pages/ProductDetails";
 import Cart from "./Pages/Cart";
-// import CheckoutPage from "./Pages/Payment";
+
 import Search from "./components/Search";
 import RegisterUser from "./Pages/Register";
 import Login from "./auth/Login";
@@ -17,6 +17,12 @@ import Orders from "./Pages/Orders";
 import OrderDetails from "./Pages/OrderDetails";
 import AdminOrders from "./admin/AdminOrders";
 import ProtectedRoute from "./auth/ProtectedRoute";
+
+import Contact from "./Pages/Contact";
+import FAQs  from "./Pages/FAQs";
+import Shipping from "./Pages/Shipping";
+import ReturnsPolicy from "./Pages/ReturnsPolicy";
+import PrivacyPolicy from "./Pages/PrivacyPolicy";
 
 import CheckoutAddress from "./components/CheckoutAddress";
 import OrderSuccess from "./Pages/OrderSuccess";
@@ -29,11 +35,12 @@ import AdminFeedback from "./admin/AdminFeedback";
 import AdminFAQs from "./admin/AdminFAQs";
 import Wishlist from "./Pages/Wishlist";
 
+
 export default function App() {
   return (
-    <BrowserRouter>
+   <>
       <Navbar />
-
+      <div className="app-content">
       <Routes>
         {/*PUBLIC*/}
         <Route path="/" element={<Home />} />
@@ -47,6 +54,11 @@ export default function App() {
         <Route path="/orders" element={<Orders />} />
         <Route path="/orders/:id" element={<OrderDetails />} />
         <Route path="/wishlist" element={<Wishlist/>}/>
+        <Route path="/contact" element={<Contact/>}/>
+        <Route path="/faqs" element={<FAQs/>}/>
+        <Route path="/shipping" element={<Shipping/>}/>
+        <Route path="/returns" element={<ReturnsPolicy/>}/>
+        <Route path="/privacy" element={<PrivacyPolicy/>}/>
         {/*CUSTOMER*/}
         <Route path="/cart" element={<ProtectedRoute role="Customer">
               <Cart />
@@ -75,8 +87,8 @@ export default function App() {
           <Route path="faqs" element={<AdminFAQs />} />
         </Route>
       </Routes>
-
+     </div>
       <Footer />
-    </BrowserRouter>
+</>
   );
 }

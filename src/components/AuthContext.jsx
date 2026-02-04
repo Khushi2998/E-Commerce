@@ -1,29 +1,23 @@
-import { createContext, useState, useEffect } from "react";
-
+import React, { createContext, useState, useEffect } from "react";
+import api from "../api/api";
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+ const [user, setUser] = useState(() => {
+  try {
+    const stored = localStorage.getItem("user");
+    return stored ? JSON.parse(stored) : null;
+  } catch (error) {
+    console.warn("Failed to parse user from localStorage:", error);
+    localStorage.removeItem("user"); 
+    return null;
+  }
+});
 
-  useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-  }, []);
-
-  const login = (data) => {
-    setUser(data);
-    localStorage.setItem("user", JSON.stringify(data));
-    localStorage.setItem("token", data.token);
+  const login = (userData) => {
+    setUser(userData);
+    localStorage.setItem("user", JSON.stringify(userData));
   };
-
-
-// setUser({
-//   name: res.data.name,
-//   email: res.data.email,
-//   role: res.data.role,
-// });
 
   const logout = () => {
     setUser(null);
@@ -32,7 +26,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user,setUser, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

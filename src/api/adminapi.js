@@ -13,7 +13,7 @@ export const addCategory = async (payload) => {
 export const deleteCategory = async (payload) => {
   await api.delete(`/admin/categories/${id}`,payload)}; 
 
-export const updateCategory = async (payload) => {
+export const updateCategory = async (id,payload) => {
   await api.put(`/admin/categories/${id}`,payload)};  
 
 // PRODUCTS
@@ -37,15 +37,8 @@ export const updateAdminProduct = (id, formData) => {
 export const getAllOrders = () =>
   api.get("/admin/orders");
 
-export const updateOrderStatus = (orderId, status) =>{
-  return api.put(`/admin/orders/${orderId}/status`, {status: status},
-    {
-      headers: {
-        "Content-Type": "application/json"
-      }
-    }
-  );
-}
+export const updateOrderItemStatus = (orderItemId, status) =>
+  api.put(`/admin/orders/items/${orderItemId}/status`, { status });
 
 export const getFeedback = () => {
   return api.get("/feedback");

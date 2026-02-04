@@ -11,15 +11,18 @@ api.interceptors.request.use(config => {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
-});
+},
+  (error) => Promise.reject(error));
 
 
 api.interceptors.response.use(
   res => res,
   err => {
     if (err.response?.status === 401) {
-      localStorage.clear();
-      window.location.href = "/login"; 
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+
+      // window.dispatchEvent(new Event("logout"));
     }
     return Promise.reject(err);
   }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import axios from "axios";
-import { NavLink } from "react-router-dom";
+import { useNavigate,NavLink } from "react-router-dom";
 import { toast } from "sonner";
 
 const API = axios.create({
@@ -16,7 +16,7 @@ const Register = () => {
     contact: "",
     email: "",
   });
-
+ const navigate = useNavigate();
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -28,17 +28,23 @@ const Register = () => {
       const res = await API.post("/register", formData);
 
       toast.success("🎉 Registration successful! Check your email.");
-
+      
       setFormData({
         name: "",
         contact: "",
         email: "",
       });
-    } catch (err) {
-      if (err.response?.status === 409) {
-    toast.error("📧 Email already registered");
+     setTimeout(() => {
+    navigate("/login");
+  }, 1500);
+
+    } catch (err) 
+{    const status = err.response?.status;
+  const message = err.response?.data?.message;
+      if (status === 409) {
+    toast.error(`📧 ${message || "Email already registered"}`);
   } else {
-    toast.error("❌ Registration failed. Try again");
+    toast.error(message || "❌ Registration failed. Try again");
   }
 }};
 
@@ -74,7 +80,7 @@ const Register = () => {
             required
           />
 
-          <button type="submit">Register</button>
+          <button className="btn" type="submit">Register</button>
         </form>
 
         <NavLink to="/login">Already Registered?</NavLink>

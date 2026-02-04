@@ -45,7 +45,10 @@ export default function AdminCategories() {
   const handleUpdate = async () => {
     if (!editingName.trim()) return toast.error("Name cannot be empty");
     try {
-      await updateCategory(editingId, { name: editingName });
+      await updateCategory(editingId, {
+  name: editingName,
+  isActive: categories.find(c => c.id === editingId)?.isActive});
+
       toast.success("Category updated");
       cancelEdit();
       loadCategories();
@@ -87,7 +90,8 @@ export default function AdminCategories() {
             <th>#</th>
             <th>Name</th>
             <th>Edit</th>
-            <th>Delete</th>
+            <th>Status</th>
+            
           </tr>
         </thead>
         <tbody>
@@ -116,8 +120,11 @@ export default function AdminCategories() {
                 )}
               </td>
               <td>
-                <button onClick={() => handleDelete(c.id)} className="btn-delete">Delete</button>
+                 <button onClick={() =>updateCategory(c.id, {name: c.name,isActive: !c.isActive}).then(loadCategories)}
+                 className={c.isActive ? "active" : "inactive"}>
+                 {c.isActive ? "Active" : "Inactive"}</button>
               </td>
+
             </tr>
           ))}
         </tbody>

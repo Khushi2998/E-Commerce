@@ -9,11 +9,15 @@ import { AuthProvider } from './components/AuthContext.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <CartProvider>
-  <AuthProvider>
-    <Toaster position="top-right" richColors />
-    <App />
-    </AuthProvider>
-    </CartProvider>
+  <BrowserRouter>
+  <CartProvider>
+      <AuthProvider>
+        
+          <Toaster position="top-right" richColors />
+          <App />
+       
+      </AuthProvider>
+       </CartProvider>
+    </BrowserRouter>
   </StrictMode>
 )

@@ -14,7 +14,7 @@ const Footer = () => {
           <h4>Quick Links</h4>
           <ul>
             <li><a href="/">Home</a></li>
-            <li><a href="/products">Products</a></li>
+            {/* <li><a href="/products">Products</a></li> */}
             <li><a href="/cart">Cart</a></li>
             <li><a href="/contact">Contact</a></li>
           </ul>
@@ -23,10 +23,10 @@ const Footer = () => {
         <div className="footer-section">
           <h4>Support</h4>
           <ul>
-            <li><a href="#">FAQs</a></li>
-            <li><a href="#">Shipping</a></li>
-            <li><a href="#">Returns</a></li>
-            <li><a href="#">Privacy Policy</a></li>
+            <li><a href="/faqs">FAQs</a></li>
+            <li><a href="/shipping">Shipping</a></li>
+            <li><a href="/returns">Returns</a></li>
+            <li><a href="/privacy">Privacy Policy</a></li>
           </ul>
         </div>
 

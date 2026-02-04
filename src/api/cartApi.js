@@ -10,12 +10,14 @@ export const getCart = async () => {
   });
   return res.data;
 };
-
+export const getCartCount = () => {
+  return api.get("/cart/count"); // <-- This needs to exist
+};
 // ADD to cart
-export const addToCart = async (productId, quantity = 1) => {
+export const addToCart = async (productId, qty = 1) => {
   await api.post(
     "/cart",
-    { productId, quantity },
+    { productId, quantity:qty },
     {
       headers: {
         "Content-Type": "application/json",

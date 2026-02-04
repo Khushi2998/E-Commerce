@@ -1,20 +1,19 @@
-import { useEffect, useState,useContext } from "react";
+import { useEffect, useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   getCart,
   updateCartItem,
   removeCartItem,
-  checkout,
 } from "../api/cartApi";
-import {confirmDelete} from "../auth/confirmDelete"
+import { confirmDelete } from "../auth/confirmDelete";
 import { MdDeleteOutline } from "react-icons/md";
-import {CartContext} from "../components/CartContext";
-
+import { CartContext } from "../components/CartContext";
+import image1 from "../../public/image1.png";
 const Cart = () => {
   const [cart, setCart] = useState([]);
-  const [editingQty, setEditingQty] = useState({});
   const { fetchCartCount } = useContext(CartContext);
   const navigate = useNavigate();
+
   const loadCart = async () => {
     const data = await getCart();
     setCart(data);
@@ -24,91 +23,87 @@ const Cart = () => {
     loadCart();
   }, []);
 
-  const commitQtyChange = async (item) => {
-    const raw = editingQty[item.cartId];
-    let qty = Number(raw);
+  /*  UPDATE QUANTITY (FIXED) */
+  const updateQty = async (item, delta) => {
+    const newQty = item.quantity + delta;
 
-    // cleanup editing state
-    setEditingQty((prev) => {
-      const copy = { ...prev };
-      delete copy[item.cartId];
-      return copy;
-    });
-
-    if (Number.isNaN(qty)) return;
-
-    if (qty < 1) {
-      await removeCartItem(item.cartId);
-      setCart((prev) =>prev.filter((i) => i.cartId !== item.cartId)
-      )
-      return;
+    if (newQty < 1) {
+      const ok = await confirmDelete("Remove this item from cart?");
+      if (!ok) return;
     }
 
-    await updateCartItem(item.cartId, qty);
-
+    //  Optimistic UI update
     setCart((prev) =>
-      prev.map((i) =>
-        i.cartId === item.cartId
-          ? { ...i, quantity: qty, total: qty * i.price }
-          : i
-      )
+      newQty < 1
+        ? prev.filter((i) => i.cartId !== item.cartId)
+        : prev.map((i) =>
+            i.cartId === item.cartId
+              ? {
+                  ...i,
+                  quantity: newQty,
+                  total: newQty * i.price,
+                }
+              : i
+          )
     );
+
+    try {
+      if (newQty < 1) {
+        await removeCartItem(item.cartId);
+      } else {
+        await updateCartItem(item.cartId, newQty);
+      }
+
+  
+      await fetchCartCount();
+
+    } catch (err) {
+      console.error(err);
+      loadCart(); // rollback
+    }
   };
 
- const updateQty=async (item,delta)=> {
-  const newQty=item.quantity+delta;
-  if (newQty < 1) {
+  /* REMOVE ITEM */
+  const handleRemove = async (id) => {
     const ok = await confirmDelete("Remove this item from cart?");
     if (!ok) return;
-  }
 
-  setCart((prev)=>
-  newQty<1? prev.filter((i)=> i.cartId !==item.cartId):prev.map((i)=>
-  i.cartId === item.cartId ? {
-    ...i,
-    quantity:newQty,
-    total:newQty*i.price,
-  }:i));
-  try{
-    if(newQty <1){
-      await removeCartItem(item.cartId);
-    }else{
-      await updateCartItem(item.cartId,newQty);
+    try {
+      await removeCartItem(id);
+
+      setCart((prev) => prev.filter((i) => i.cartId !== id));
+
+      //  update navbar count
+      await fetchCartCount();
+
+    } catch (err) {
+      console.error("Failed to remove item:", err);
+      loadCart();
     }
-    await fetchCartCount();
-  }catch(err){
-    console.error(err);
-    loadCart();
-  }
- }
+  };
 
-  const handleRemove = async (id) => {
-     const ok = await confirmDelete("Remove this item from cart?");
-  if (!ok) return;
-    try{
-    await removeCartItem(id);
-    await fetchCartCount();
-    await loadCart();
-    }catch (err) {
-    console.error("Failed to remove item:", err);
-    }};
-  const handleCheckout = async () => {
-   
+  const handleCheckout = () => {
     navigate("/checkout");
- 
-};
+  };
 
-  const total = cart.reduce((sum, i) => sum + i.total, 0);
+  /*  TOTAL  */
+  const total = cart.reduce(
+    (sum, i) => sum + i.quantity * i.price,
+    0
+  );
 
   return (
     <div className="cart-page">
       <h2>My Cart</h2>
 
-      {cart.length === 0 && <p className="empty">Cart is empty</p>}
+      {cart.length === 0 && <img src={image1} alt="Your cart is empty " className="empty-state"/>}
 
       {cart.map((item) => (
         <div key={item.cartId} className="cart-card">
-          <img src={`http://localhost:5253${item.image}`} alt={item.productName} />
+          <img
+            src={`http://localhost:5253${item.image}`}
+            alt={item.productName}
+          />
 
           <div className="info">
             <h4>{item.productName}</h4>
@@ -117,24 +112,24 @@ const Cart = () => {
 
           <div className="qty-control">
             <button
-            className={`qty-btn ${item.quantity === 1 ? "danger" : ""}`}
-    onClick={() => updateQty(item, -1)}
-    title={item.quantity === 1 ? "Remove item" : "Decrease quantity"}
-  >
-    {item.quantity === 1 ? <MdDeleteOutline /> : "−"}
+              className={`qty-btn ${item.quantity === 1 ? "danger" : ""}`}
+              onClick={() => updateQty(item, -1)}
+              title={item.quantity === 1 ? "Remove item" : "Decrease quantity"}
+            >
+              {item.quantity === 1 ? <MdDeleteOutline /> : "−"}
             </button>
 
             <span className="qty-value">{item.quantity}</span>
 
             <button
-              className="qty-btn"    
+              className="qty-btn"
               onClick={() => updateQty(item, +1)}
             >
               +
             </button>
           </div>
-          
-          <div className="total">₹{item.total}</div>
+
+          <div className="total">₹{item.quantity * item.price}</div>
 
           <button
             className="remove"
@@ -142,7 +137,6 @@ const Cart = () => {
           >
             ✕
           </button>
-          
         </div>
       ))}
 

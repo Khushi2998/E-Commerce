@@ -1,106 +1,181 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getOrderDetails } from "../api/api";
+import api, { getOrderDetails } from "../api/api";
 
-export default function OrderDetails() {
-  const { id } = useParams();
-  const [order, setOrder] = useState(null);
-  const steps = [
+const ITEM_STEPS = [
   "Pending",
   "Placed",
   "Shipped",
   "Out For Delivery",
   "Delivered"
 ];
-  useEffect(() => {
-    getOrderDetails(id).then(res => setOrder(res.data));
-  }, [id]);
 
-  if (!order) return <p>Loading...</p>;
+/* =========================
+   ITEM STEPPER (PER PRODUCT)
+========================= */
+const ItemStepper = ({ status }) => {
+  if (status === "Cancelled") {
+    return (
+      <div className="stepper cancelled">
+        <span className="cancelled-label">❌ Item Cancelled</span>
+      </div>
+    );
+  }
+
+  const currentIndex = ITEM_STEPS.indexOf(status);
 
   return (
-    <div className="page">
-      <h2>Order #{order.id}</h2>
+    <div className="stepper">
+      {ITEM_STEPS.map((step, index) => {
+        const isCompleted = index < currentIndex;
+        const isActive = index === currentIndex;
 
-      <p><b>Status:</b> {order.status}</p>
-      <p><b>Total:</b> ₹{order.totalAmount}</p>
-      <p><b>Placed:</b> {new Date(order.createdAt).toLocaleString()}</p>
+        return (
+          <div key={step} className="step-wrapper">
+            {index !== 0 && (
+              <div
+                className={`step-line ${
+                  index <= currentIndex ? "completed" : ""
+                }`}
+              />
+            )}
 
-      <h4>Shipping Address:</h4>
-      <p>{order.shippingAddress}</p>
+            <div
+              className={`step-circle 
+                ${isCompleted ? "completed" : ""} 
+                ${isActive ? "active" : ""}`}
+            >
+              {isCompleted ? "✓" : ""}
+            </div>
 
-      {/* <StatusTimeline status={order.status} /> */}
-      <div className="stepper">
-        <div className="stepper-line">
-    <div
-      className="stepper-line-progress"
-      style={{
-        width: `${(steps.indexOf(order.status) / (steps.length - 1)) * 100}%`
-      }}
-    />
-  </div>
-  {steps.map((step, index) => {
-   const currentIndex = steps.indexOf(order.status);
-  const isCompleted = index < currentIndex;
-  const isActive = index === currentIndex;
+            <span
+              className={`step-label 
+                ${isCompleted ? "completed" : ""} 
+                ${isActive ? "active" : ""}`}
+            >
+              {step}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
-    return (
-      <div key={index} className="step-wrapper">
+/* =========================
+   MAIN PAGE
+========================= */
+export default function OrderDetails() {
+  const { id } = useParams();
+  const [order, setOrder] = useState(null);
+  const [loadingItemId, setLoadingItemId] = useState(null);
 
-        {/* CIRCLE */}
-        <div
-          className={`step-circle 
-            ${isCompleted ? "completed" : ""} 
-            ${isActive ? "active" : ""}`}
-        >
-          {isCompleted ? "✓" : ""}
-        </div>
-        
-      {/* CONNECTOR LINE */}
-        {index !== 0 && (
-          <div
-            className={`step-line 
-              ${index <= currentIndex ? "completed" : ""}`}
-          />
-        )}
-        {/* LABEL */}
-        <span
-          className={`step-label 
-            ${isCompleted ? "completed" : ""} 
-            ${isActive ? "active" : ""}`}
-        >
-          {step}
-        </span>
+  useEffect(() => {
+    fetchOrder();
+  }, [id]);
 
-        </div>
-    );
-  })}
-</div>
+  const fetchOrder = async () => {
+    const res = await getOrderDetails(id);
+    setOrder(res.data);
+  };
+
+  const cancelItem = async (itemId) => {
+    if (!window.confirm("Cancel this item?")) return;
+    setLoadingItemId(itemId);
+
+    try {
+      await api.post(`/orders/items/${itemId}/cancel`);
+      await fetchOrder();
+    } catch {
+      alert("Unable to cancel item");
+    }
+    setLoadingItemId(null);
+  };
+
+  if (!order) return <p className="loading">Loading order…</p>;
+
+  const isPrepaid = order.paymentMethod !== "COD";
+
+  return (
+    <div className="order-page">
+
+      {/* HEADER */}
+      <div className="order-header">
+        <h2>Order #{order.id}</h2>
+        <span className={`badge payment ${order.paymentMethod.toLowerCase()}`}>
+  {order.paymentMethod}
+</span>
+      </div>
+
+      {/* META */}
+      <div className="order-meta">
+        <p><b>Total:</b> ₹{order.totalAmount}</p>
+        <p><b>Placed:</b> {new Date(order.createdAt).toLocaleString()}</p>
+      </div>
+
+      {/* ADDRESS */}
+      <div className="card">
+        <h4>Shipping Address</h4>
+        <p>{order.shippingAddress}</p>
+      </div>
+
+      {/* ITEMS */}
+      <h3 className="section-title">Items</h3>
+
+      <div className="order-items-details">
+        {order.items.map(item => (
+          <div key={item.itemId} className="item-card">
+
+            <img
+              src={`http://localhost:5253${item.image}`}
+              alt={item.name}
+              onError={(e) => (e.target.src = "/placeholder.webp")}
+            />
+
+            <div className="item-info">
+              <div className="item-top">
+                <h4>{item.name}</h4>
+
+                {/* STATUS BADGES */}
+                {item.status === "Cancelled" && isPrepaid && (
+                  <span className="badge refund initiated">
+                    Refund Initiated (UPI)
+                  </span>
+                )}
+
+                {item.status === "Cancelled" && !isPrepaid && (
+                  <span className="badge neutral">
+                    Cancelled (No refund)
+                  </span>
+                )}
+
+                {item.status === "Delivered" && (
+                  <span className="badge success">Delivered</span>
+                )}
+              </div>
+
+              <p>Qty: {item.quantity}</p>
+              <p className="price">₹{item.price}</p>
+
+              {/* PER-ITEM STEPPER */}
+              <ItemStepper status={item.status} />
+
+              {/* ACTION */}
+              {(item.status === "Pending" || item.status === "Placed") && (
+                <button
+                  className="btn danger"
+                  disabled={loadingItemId === item.itemId}
+                  onClick={() => cancelItem(item.itemId)}
+                >
+                  {loadingItemId === item.itemId
+                    ? "Cancelling..."
+                    : "Cancel Item"}
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
-
-const STATUS_STEPS = [
-  "Pending",
-  "Placed",
-  "Shipped",
-  "OutForDelivery",
-  "Delivered"
-];
-
-const StatusTimeline = ({ status }) => {
-  const currentIndex = STATUS_STEPS.indexOf(status);
-
-  return (
-    <ul className="timeline">
-      {STATUS_STEPS.map((step,index) => (
-        <li
-          key={step}
-          className={index <= currentIndex ? "done" : ""}
-        >
-          {step.replace(/([A-Z])/g, " $1")}
-        </li>
-      ))}
-    </ul>
-  );
-};
