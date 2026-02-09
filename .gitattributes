@@ -1,0 +1,10 @@
+# Backend
+Backend/** linguist-language=C#
+
+# Frontend (React / Vite)
+InfinityStore/** linguist-language=JavaScript
+
+# Ignore generated backend files
+Backend/**/bin/** linguist-generated=true
+Backend/**/obj/** linguist-generated=true
+Backend/**/Migrations/** linguist-generated=true
